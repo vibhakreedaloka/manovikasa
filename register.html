@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register — Champion Parenting Masterclass | ManoVikasa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1B3A6B;
+    --navy-deep: #0F2347;
+    --navy-mid: #2A4F8A;
+    --orange: #E8832A;
+    --orange-light: #F5A455;
+    --orange-dark: #C46820;
+    --cream: #FFF8F0;
+    --cream-dark: #F5EDE0;
+    --text-dark: #1A1A1A;
+    --text-mid: #444444;
+    --text-light: #777777;
+    --white: #FFFFFF;
+    --green: #2E7D52;
+    --border: #E0D8CF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    background: var(--navy-deep);
+    color: #fff;
+    text-align: center;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  .topbar span { color: var(--orange-light); }
+
+  /* ── NAV ── */
+  nav {
+    background: var(--white);
+    padding: 14px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .nav-logo { height: 44px; }
+  .nav-back {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--navy);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+  }
+  .nav-back:hover { color: var(--orange); }
+
+  /* ── MAIN LAYOUT ── */
+  .page-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 20px 64px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 48px;
+    align-items: start;
+  }
+  .left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-right: 8px;
+  }
+  .right-panel { align-self: start; }
+
+  /* ── LEFT PANEL ── */
+
+  .event-badge {
+    display: inline-block;
+    background: var(--orange);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+
+  .event-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(22px, 3.5vw, 32px);
+    font-weight: 800;
+    color: var(--navy);
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+
+  .event-subtitle {
+    font-size: 15px;
+    color: var(--text-mid);
+    line-height: 1.65;
+    margin-bottom: 28px;
+    font-weight: 300;
+  }
+
+  .session-details {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 5px 24px;
+    margin-bottom: 28px;
+  }
+  .session-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    font-size: 14px;
+  }
+  .session-row:last-child { border-bottom: none; }
+  .session-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+  .session-label { font-weight: 600; color: var(--navy); min-width: 72px; }
+  .session-value { color: var(--text-mid); }
+
+  .kannada-note {
+    background: rgba(27,58,107,0.06);
+    border-left: 3px solid var(--orange);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--text-mid);
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+  .kannada-note strong { color: var(--navy); display: block; margin-bottom: 2px; font-size: 15px; }
+
+  .after-reg {
+    background: var(--cream-dark);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    font-size: 14px;
+    color: var(--text-mid);
+    line-height: 1.65;
+  }
+  .after-reg strong { color: var(--navy); }
+
+  .contact-block { font-size: 14px; color: var(--text-mid); }
+  .contact-block p { font-weight: 600; color: var(--navy); margin-bottom: 10px; font-size: 15px; }
+  .contact-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    text-decoration: none;
+    color: var(--navy);
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .contact-item:hover { color: var(--orange); }
+  .contact-item .icon { font-size: 16px; }
+
+  /* ── RIGHT PANEL — FORM ── */
+  .right-panel {}
+
+  .form-card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 36px 32px;
+    box-shadow: 0 8px 40px rgba(27,58,107,0.12);
+    border: 1px solid rgba(0,0,0,0.06);
+    position: sticky;
+    top: 20px;
+  }
+
+  .form-card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+  }
+  .form-card .form-sub {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .form-group { margin-bottom: 18px; }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 7px;
+    letter-spacing: 0.02em;
+  }
+  .form-group label span.req { color: var(--orange); margin-left: 2px; }
+
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-dark);
+    background: var(--white);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  .form-input:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px rgba(232,131,42,0.12);
+  }
+  .form-input::placeholder { color: #BBBBBB; }
+
+  .phone-row {
+    display: flex;
+    gap: 0;
+  }
+  .phone-prefix {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--navy);
+    background: var(--cream-dark);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .phone-input {
+    border-radius: 0 8px 8px 0 !important;
+    flex: 1;
+  }
+
+  .radio-group, .select-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    font-size: 14px;
+    color: var(--text-dark);
+    user-select: none;
+  }
+  .radio-option:hover { border-color: var(--orange); background: rgba(232,131,42,0.04); }
+  .radio-option input[type="radio"],
+  .radio-option input[type="checkbox"] {
+    accent-color: var(--orange);
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .radio-option.selected {
+    border-color: var(--orange);
+    background: rgba(232,131,42,0.06);
+  }
+
+  select.form-input {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23777' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  .submit-btn {
+    width: 100%;
+    background: var(--orange);
+    color: white;
+    font-size: 17px;
+    font-weight: 700;
+    padding: 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+    box-shadow: 0 6px 20px rgba(232,131,42,0.35);
+    margin-top: 8px;
+    letter-spacing: 0.02em;
+  }
+  .submit-btn:hover {
+    background: var(--orange-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px rgba(232,131,42,0.45);
+  }
+  .submit-btn:active { transform: translateY(0); }
+
+  .form-note {
+    font-size: 12px;
+    color: var(--text-light);
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+  .form-note span { color: var(--green); font-weight: 600; }
+
+  /* ── SUCCESS STATE ── */
+  .success-state {
+    display: none;
+    text-align: center;
+    padding: 20px 0;
+  }
+  .success-icon { font-size: 52px; margin-bottom: 16px; }
+  .success-state h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    color: var(--navy);
+    margin-bottom: 10px;
+  }
+  .success-state p { font-size: 15px; color: var(--text-mid); line-height: 1.65; margin-bottom: 8px; }
+  .success-state .whatsapp-cta {
+    display: inline-block;
+    background: #25D366;
+    color: white;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    margin-top: 16px;
+    transition: background 0.2s;
+  }
+  .success-state .whatsapp-cta:hover { background: #1EB358; }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--navy-deep);
+    padding: 24px 40px;
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    border-top: 3px solid var(--orange);
+  }
+  footer a { color: rgba(255,255,255,0.6); text-decoration: none; }
+
+  
+  @media (max-width: 760px) {
+    .page-wrap { display: flex; flex-direction: column; gap: 24px; padding: 24px 16px 48px; }
+    .left-col    { display: contents; }
+    .left-top    { order: 1; }
+    .right-panel { order: 2; }
+    .left-bottom { order: 3; }
+  }
+
+
+  .error-msg {
+    display: none;
+    font-size: 12px;
+    color: #C0392B;
+    margin-top: 5px;
+    font-weight: 500;
+  }
+  .error-msg.visible { display: block; }
+  .form-input.error { border-color: #C0392B; box-shadow: 0 0 0 3px rgba(192,57,43,0.1); }
+  .radio-group.error .radio-option:first-child,
+  .radio-group.error { outline: none; }
+  .field-error-group { border: 1.5px solid #C0392B; border-radius: 10px; padding: 2px; }
+
+  @media (max-width: 480px) {
+    .form-card { padding: 24px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  🔴 Live Online — <span>Seats are limited. Register now to secure your spot.</span>
+</div>
+
+<!-- NAV -->
+<nav>
+  <img src="images/manovikasa-logo_no_bg_dark_text.png" alt="ManoVikasa Champion Parenting" class="nav-logo">
+</nav>
+
+<!-- MAIN -->
+<div class="page-wrap">
+
+  <!-- LEFT COLUMN -->
+  <div class="left-col">
+  <!-- LEFT TOP: Event Info -->
+  <div class="left-top">
+    <div class="event-badge">🎁 Free Live Masterclass</div>
+    <h1 class="event-title">Champion Parenting Masterclass</h1>
+    <p class="event-subtitle">A free 90-minute live session where you learn how to reduce screen time, handle tantrums, and raise a confident, disciplined child — without shouting, guilt, or daily power struggles.</p>
+
+    <div class="session-details">
+      <div class="session-row">
+        <span class="session-icon">📅</span>
+        <span class="session-label">Date</span>
+        <span class="session-value">Wednesday, 1<sup>st</sup> April 2026</span>
+      </div>
+      <div class="session-row">
+        <span class="session-icon">⏰</span>
+        <span class="session-label">Time</span>
+        <span class="session-value">8:00 PM – 9:30 PM IST</span>
+      </div>
+      <div class="session-row">
+        <span class="session-icon">💻</span>
+        <span class="session-label">Platform</span>
+        <span class="session-value">Live on Zoom (link shared after registration)</span>
+      </div>
+      <div class="session-row">
+        <span class="session-icon">🗣️</span>
+        <span class="session-label">Language</span>
+        <span class="session-value">KangLish (Kannada + English)</span>
+      </div>
+      <div class="session-row">
+        <span class="session-icon">⏱️</span>
+        <span class="session-label">Duration</span>
+        <span class="session-value">90 Minutes</span>
+      </div>
+    </div>
+
+  </div><!-- end left-top -->
+
+  <!-- LEFT BOTTOM: Extra Info -->
+  <div class="left-bottom">
+    <div class="kannada-note">
+      <strong>ಈ Masterclass ಸಂಪೂರ್ಣ Kannada ನಲ್ಲಿ ನಡೆಯುತ್ತದೆ</strong>
+      This masterclass will be conducted fully in Kannada + English — comfortable for every Kannada-speaking parent.
+    </div>
+
+    <div class="after-reg">
+      <strong>After registration:</strong> You will receive the Zoom link on your email. Make sure to check your inbox (and spam folder) after submitting the form.
+    </div>
+
+    <div class="contact-block">
+      <p>Any Questions? Contact Us:</p>
+      <a href="mailto:support@manovikasa.com" class="contact-item">
+        <span class="icon">✉️</span> support@manovikasa.com
+      </a>
+      <a href="tel:+918105408234" class="contact-item">
+        <span class="icon">📞</span> +91 81054 08234
+      </a>
+    </div>
+  </div><!-- end left-bottom -->
+  </div><!-- end left-col -->
+
+  <!-- RIGHT: Registration Form -->
+  <div class="right-panel">
+    <div class="form-card">
+
+      <div id="formView">
+        <h2>Registration Details</h2>
+        <p class="form-sub">Complete your registration by providing the details below. All fields marked <span style="color:var(--orange)">*</span> are required.</p>
+
+        <form id="regForm" onsubmit="handleSubmit(event)" novalidate>
+
+          <!-- Name -->
+          <div class="form-group">
+            <label>Full Name <span class="req">*</span></label>
+            <input type="text" class="form-input" id="name" placeholder="Enter your full name">
+            <span class="error-msg" id="err-name">Please enter your full name.</span>
+          </div>
+
+          <!-- Email -->
+          <div class="form-group">
+            <label>Email Address <span class="req">*</span></label>
+            <input type="email" class="form-input" id="email" placeholder="Enter your email address">
+            <span class="error-msg" id="err-email">Please enter a valid email address.</span>
+          </div>
+
+          <!-- Phone -->
+          <div class="form-group">
+            <label>Phone Number <span class="req">*</span></label>
+            <div class="phone-row">
+              <div class="phone-prefix">🇮🇳 +91</div>
+              <input type="tel" class="form-input phone-input" id="phone" placeholder="Enter your mobile number" maxlength="10">
+            </div>
+            <span class="error-msg" id="err-phone">Please enter a valid 10-digit mobile number.</span>
+          </div>
+
+          <!-- Do you know Kannada -->
+          <div class="form-group">
+            <label>Do you know Kannada? <span class="req">*</span></label>
+            <div class="radio-group" id="kannadaGroup">
+              <label class="radio-option" onclick="selectRadio(this, 'kannadaGroup')">
+                <input type="radio" name="kannada" value="yes_fluent"> Yes, I speak Kannada fluently
+              </label>
+              <label class="radio-option" onclick="selectRadio(this, 'kannadaGroup')">
+                <input type="radio" name="kannada" value="yes_basic"> Yes, I understand basic Kannada
+              </label>
+              <label class="radio-option" onclick="selectRadio(this, 'kannadaGroup')">
+                <input type="radio" name="kannada" value="no"> No, but I am comfortable with English
+              </label>
+            </div>
+          <span class="error-msg" id="err-kannada">Please select your Kannada language preference.</span>
+          </div>
+
+          <!-- Number of children -->
+          <div class="form-group">
+            <label>How many children do you have? <span class="req">*</span></label>
+            <select class="form-input" id="numChildren" required>
+              <option value="" disabled selected>Select number of children</option>
+              <option value="1">1 child</option>
+              <option value="2">2 children</option>
+              <option value="3">3 children</option>
+              <option value="4+">4 or more children</option>
+            </select>
+            <span class="error-msg" id="err-children">Please select how many children you have.</span>
+          </div>
+
+          <!-- Age 3-12 -->
+          <div class="form-group">
+            <label>Are your children in the age group 3–12 years? <span class="req">*</span></label>
+            <div class="radio-group" id="ageGroup">
+              <label class="radio-option" onclick="selectRadio(this, 'ageGroup')">
+                <input type="radio" name="ageRange" value="yes_all"> Yes, all my children are between 3–12
+              </label>
+              <label class="radio-option" onclick="selectRadio(this, 'ageGroup')">
+                <input type="radio" name="ageRange" value="yes_some"> Yes, at least one of my children is between 3–12
+              </label>
+              <label class="radio-option" onclick="selectRadio(this, 'ageGroup')">
+                <input type="radio" name="ageRange" value="no"> No, my children are outside this age group
+              </label>
+            </div>
+            <span class="error-msg" id="err-age">Please select your children's age group.</span>
+          </div>
+
+          <button type="submit" class="submit-btn">👉 Register Now — It's Free!</button>
+          <p class="form-note"><span>🔒 Secure & Private</span> · Your details will never be shared with anyone</p>
+
+        </form>
+      </div>
+
+      <!-- Success State -->
+      <div class="success-state" id="successView">
+        <div class="success-icon">🎉</div>
+        <h3>You're Registered!</h3>
+        <p>Welcome to the <strong>Champion Parenting Masterclass</strong>.</p>
+        <p>Check your email for the confirmation and Zoom link. See you on <strong>1<sup>st</sup> April 2026 at 8:00 PM IST!</strong></p>
+        <p style="margin-top:12px;font-size:13px;color:var(--text-light);">Didn't receive an email? Check your spam folder or contact us at support@manovikasa.com</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 ManoVikasa — Champion Parenting · Built with love for Indian Families</p>
+  <p style="margin-top:6px;"><a href="#">Privacy Policy</a> · <a href="#">Refund Policy</a> · <a href="#">Terms &amp; Conditions</a></p>
+</footer>
+
+<script>
+function selectRadio(label, groupId) {
+  document.querySelectorAll('#' + groupId + ' .radio-option').forEach(el => el.classList.remove('selected'));
+  label.classList.add('selected');
+}
+
+function clearError(inputEl, errId) {
+  if (inputEl) inputEl.classList.remove('error');
+  const err = document.getElementById(errId);
+  if (err) err.classList.remove('visible');
+}
+
+function showError(inputEl, errId) {
+  if (inputEl) inputEl.classList.add('error');
+  const err = document.getElementById(errId);
+  if (err) err.classList.add('visible');
+}
+
+// Clear errors on input
+document.getElementById('name').addEventListener('input', function() { clearError(this, 'err-name'); });
+document.getElementById('email').addEventListener('input', function() { clearError(this, 'err-email'); });
+document.getElementById('phone').addEventListener('input', function() { clearError(this, 'err-phone'); });
+document.getElementById('numChildren').addEventListener('change', function() { clearError(this, 'err-children'); });
+document.querySelectorAll('input[name="kannada"]').forEach(r => r.addEventListener('change', function() { clearError(null, 'err-kannada'); }));
+document.querySelectorAll('input[name="ageRange"]').forEach(r => r.addEventListener('change', function() { clearError(null, 'err-age'); }));
+
+function handleSubmit(e) {
+  e.preventDefault();
+
+  const nameEl     = document.getElementById('name');
+  const emailEl    = document.getElementById('email');
+  const phoneEl    = document.getElementById('phone');
+  const childrenEl = document.getElementById('numChildren');
+  const kannada    = document.querySelector('input[name="kannada"]:checked');
+  const ageRange   = document.querySelector('input[name="ageRange"]:checked');
+
+  const name     = nameEl.value.trim();
+  const email    = emailEl.value.trim();
+  const phone    = phoneEl.value.trim();
+  const children = childrenEl.value;
+
+  let firstError = null;
+  let hasError = false;
+
+  // Validate each field
+  if (!name) {
+    showError(nameEl, 'err-name');
+    if (!firstError) firstError = nameEl;
+    hasError = true;
+  } else { clearError(nameEl, 'err-name'); }
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showError(emailEl, 'err-email');
+    if (!firstError) firstError = emailEl;
+    hasError = true;
+  } else { clearError(emailEl, 'err-email'); }
+
+  if (!phone || phone.length < 10) {
+    showError(phoneEl, 'err-phone');
+    if (!firstError) firstError = phoneEl;
+    hasError = true;
+  } else { clearError(phoneEl, 'err-phone'); }
+
+  if (!kannada) {
+    showError(null, 'err-kannada');
+    if (!firstError) firstError = document.querySelector('input[name="kannada"]');
+    hasError = true;
+  } else { clearError(null, 'err-kannada'); }
+
+  if (!children) {
+    showError(childrenEl, 'err-children');
+    if (!firstError) firstError = childrenEl;
+    hasError = true;
+  } else { clearError(childrenEl, 'err-children'); }
+
+  if (!ageRange) {
+    showError(null, 'err-age');
+    if (!firstError) firstError = document.querySelector('input[name="ageRange"]');
+    hasError = true;
+  } else { clearError(null, 'err-age'); }
+
+  if (hasError) {
+    firstError.focus();
+    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  // All valid — send data to Google Sheets then redirect
+  const encodedName = encodeURIComponent(name.split(' ')[0]);
+
+  const payload = {
+    webinarDate: "1st April 2026",
+    name: name,
+    email: email,
+    phone: phone,
+    kannada: document.querySelector('input[name="kannada"]:checked').value,
+    children: children,
+    ageRange: document.querySelector('input[name="ageRange"]:checked').value
+  };
+
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbybqt2jyRjGssMhFECIQomlj-5FtQdb5hG8ou3P8AnkPCgreGPKDJ2xTdPiEHLw4KkK8A/exec";
+
+  const submitBtn = document.querySelector('.submit-btn');
+  submitBtn.textContent = "Registering...";
+  submitBtn.disabled = true;
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+  .catch(() => {}) // no-cors means we can't read response, so silently continue
+  .finally(() => {
+    window.location.href = 'thankyou.html?name=' + encodedName;
+  });
+}
+</script>
+</body>
+</html>
