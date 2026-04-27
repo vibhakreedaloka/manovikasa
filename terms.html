@@ -1,266 +1,94 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Terms &amp; Conditions — ManoVikasa</title>
-<link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png">
-<meta property="og:title" content="Terms & Conditions — ManoVikasa">
-<meta property="og:type" content="website">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Terms &amp; Conditions – AhanaPranayamaCenter</title>
+<link href="assets/16x16.png" rel="icon" sizes="16x16"/>
+<link href="assets/32x32.png" rel="icon" sizes="32x32"/>
+<link href="assets/180x180.png" rel="apple-touch-icon" sizes="180x180"/>
 <style>
-  :root {
-    --navy: #1B3A6B;
-    --navy-deep: #0F2347;
-    --navy-mid: #2A4F8A;
-    --orange: #E8832A;
-    --orange-light: #F5A455;
-    --orange-dark: #C46820;
-    --cream: #FFF8F0;
-    --cream-dark: #F5EDE0;
-    --text-dark: #1A1A1A;
-    --text-mid: #444444;
-    --text-light: #777777;
-    --white: #FFFFFF;
-    --green: #2E7D52;
-    --border: #E0D8CF;
+    :root{ --ink:#0b1220; --cta:#2563eb; }
+    body{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; margin:0; color:var(--ink); background:#fff; }
+    header{ padding:18px 16px; border-bottom:1px solid #eee; }
+    header .container{ max-width:1024px; margin:0 auto; display:flex; align-items:center; gap:14px; }
+    header img{ height:50px; }
+    main{ max-width:880px; margin:32px auto; padding:0 16px 60px; }
+    h1{ font-size:30px; margin:6px 0 18px; font-weight:900; }
+    h2{ font-size:20px; font-weight:800; margin:22px 0 10px; line-height:1.35; }
+    h3{ font-size:18px; font-weight:700; margin:14px 0 8px; }
+    p{ line-height:1.7; margin:12px 0; }
+    a{ color:var(--cta); }
+    footer{ border-top:1px solid #eee; padding:18px 16px; }
+    footer .container{ max-width:1024px; margin:0 auto; font-size:14px; color:#6b7280; text-align:center; }
+  </style>
+<style id="ai-patch-0916">/* AI Patch 2025-09-16 */
+@media (max-width: 640px){
+  header.site-header .nav-cta a .mobile-break { display:block; }
+  header.site-header .nav-cta a { white-space: normal; display:inline-block; line-height:1.1; text-align:center; padding-left:0.75rem; padding-right:0.75rem; }
+  .hero .headline { text-align:center; }
+  .hero .hero-top { text-align:center; }
+  .hero .hero-subline { text-align:center; }
+}
+.hero .headline { text-align:center; } /* ensure desktop too */
+.hero .hero-top { text-align:center; }
+.hero .hero-guarantee { text-align:center; font-size:120%; }
+.hero .hero-subline { font-size:120%; }
+.footer-bar { position:relative; background:#f6f8fa; border-top:1px solid #e5e7eb; padding:12px 16px; font-size:14px; color:#111827; }
+.footer-bar .center-text { text-align:center; }
+.footer-bar .right-links { position:absolute; right:16px; top:50%; transform:translateY(-50%); display:flex; gap:4px; flex-direction:column; text-align:right; }
+.footer-bar .right-links a { text-decoration:none; color:#0f172a; }
+@media (max-width: 640px){
+  .footer-bar { padding-bottom: 16px; }
+}
+/* End AI Patch */</style><style id="ai-policy-center">/* Policy header centering */
+header.ai-policy-header{
+  display:grid !important;
+  grid-template-columns: 1fr auto 1fr !important;
+  align-items:center !important;
+  position:relative;
+}
+header.ai-policy-header .ai-center-title{
+  grid-column: 1 / -1;
+  justify-self:center;
+  text-align:center;
+  margin:0 auto;
+}
+@media (max-width: 640px){
+  header.ai-policy-header{ grid-template-columns: 1fr auto 1fr; }
+}
+@media (max-width: 640px){
+  header.ai-policy-header{
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto !important;
+    row-gap: 8px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
   }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; }
-
-  /* ── TOPBAR ── */
-  .topbar {
-    background: var(--navy-deep);
-    color: #fff;
-    text-align: center;
-    padding: 10px 20px;
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
+  header.ai-policy-header .ai-center-title{
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    margin-top: 6px !important;
   }
-  .topbar span { color: var(--orange-light); }
-
-  /* ── NAV ── */
-  nav {
-    background: var(--white);
-    padding: 14px 40px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  header.ai-policy-header img{
+    transform: scale(1.0) !important;
+    max-height: 56px !important;
+    height: auto !important;
   }
-  .nav-logo { height: 44px; }
-  .nav-back {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--navy);
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: color 0.2s;
-  }
-  .nav-back:hover { color: var(--orange); }
-
-  /* ── CONTENT ── */
-  .page-wrap {
-    max-width: 820px;
-    margin: 0 auto;
-    padding: 48px 20px 64px;
-  }
-
-  .content-card {
-    background: var(--white);
-    border-radius: 16px;
-    padding: 44px 40px;
-    box-shadow: 0 8px 40px rgba(27,58,107,0.12);
-    border: 1px solid rgba(0,0,0,0.06);
-  }
-
-  .content-card h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(24px, 3.5vw, 32px);
-    font-weight: 800;
-    color: var(--navy);
-    line-height: 1.2;
-    margin-bottom: 8px;
-  }
-  .content-card .subtitle {
-    font-size: 14px;
-    color: var(--text-light);
-    margin-bottom: 32px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .content-card h2 {
-    font-family: 'Playfair Display', serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--navy);
-    margin-top: 32px;
-    margin-bottom: 12px;
-  }
-
-  .content-card h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--navy-mid);
-    margin-top: 24px;
-    margin-bottom: 8px;
-  }
-
-  .content-card p {
-    font-size: 15px;
-    color: var(--text-mid);
-    line-height: 1.75;
-    margin-bottom: 16px;
-  }
-
-  .content-card a {
-    color: var(--orange);
-    text-decoration: none;
-    font-weight: 500;
-  }
-  .content-card a:hover { text-decoration: underline; }
-
-  .legal-caps {
-    font-size: 13px;
-    color: var(--text-light);
-    line-height: 1.75;
-    margin-bottom: 16px;
-    padding: 20px 24px;
-    background: var(--cream-dark);
-    border-radius: 10px;
-    text-transform: none;
-  }
-
-  .highlight-box {
-    background: var(--cream-dark);
-    border-radius: 10px;
-    padding: 20px 24px;
-    margin: 24px 0;
-    font-size: 14px;
-    color: var(--text-mid);
-    line-height: 1.7;
-  }
-  .highlight-box strong { color: var(--navy); }
-
-  .contact-box {
-    background: rgba(27,58,107,0.06);
-    border-left: 3px solid var(--orange);
-    border-radius: 0 8px 8px 0;
-    padding: 16px 20px;
-    margin-top: 28px;
-    font-size: 14px;
-    color: var(--text-mid);
-    line-height: 1.65;
-  }
-  .contact-box strong { color: var(--navy); display: block; margin-bottom: 4px; font-size: 15px; }
-
-  /* ── FOOTER ── */
-  footer {
-    background: var(--navy-deep);
-    padding: 24px 40px;
-    text-align: center;
-    font-size: 13px;
-    color: rgba(255,255,255,0.4);
-    border-top: 3px solid var(--orange);
-  }
-  footer a { color: rgba(255,255,255,0.6); text-decoration: none; }
-  footer a:hover { color: rgba(255,255,255,0.85); }
-
-  @media (max-width: 600px) {
-    .content-card { padding: 28px 20px; }
-    nav { padding: 14px 16px; }
-  }
-</style>
+}</style><link rel="icon" type="image/png" sizes="16x16" href="assets/16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/180x180.png">
 </head>
 <body>
-
-<!-- NAV -->
-<nav>
-  <a href="index.html"><img src="images/manovikasa-logo_no_bg_dark_text.png" alt="ManoVikasa Champion Parenting" class="nav-logo"></a>
-  <a href="index.html" class="nav-back">← Back to Home</a>
-</nav>
-
-<!-- CONTENT -->
-<div class="page-wrap">
-  <div class="content-card">
-    <h1>Terms &amp; Conditions</h1>
-    <p class="subtitle">By visiting <a href="https://www.manovikasa.com">www.manovikasa.com</a> or purchasing products from us, you are consenting to our Terms of Service.</p>
-
-    <h2>General</h2>
-    <p>This site (the "Site") is owned and developed by "ManoVikasa" ("COMPANY," "we" or "us"). By utilizing the Site, you consent to be bound by these Terms of Service and to utilize the Site as per these Terms of Service, our Privacy Policy and any extra terms and conditions that may apply to explicit areas of the Site or to items and administrations accessible through the Site or from COMPANY. Getting to the Site, in any way, regardless of whether robotized or something else, establishes utilization of the Site and your consent to be bound by these Terms of Service.</p>
-    <p>We maintain whatever authority is needed to change these Terms of Service or to force new conditions on utilization of the Site, when necessary, in which case we will post the updated Terms of Service on this site. By proceeding to utilize the Site after we post any such changes, you acknowledge the Terms of Service, as altered.</p>
-
-    <h2>Intellectual Property Rights</h2>
-
-    <h3>Our Limited License to You</h3>
-    <p>This Site and every one of the materials accessible on the Site are the property of us and additionally our partners or licensors, and are ensured by copyright, trademark, and other protected innovation laws. The Site is given exclusively to your own noncommercial use. You may not utilize the Site or the materials accessible on the Site in a way that establishes an encroachment of our rights or that has not been approved by us.</p>
-    <p>All the more explicitly, except if unequivocally approved in these Terms of Service or by the proprietor of the materials, you may not alter, duplicate, imitate, republish, transfer, post, transmit, decipher, sell, make subsidiary works, misuse, or convey in any way or medium (counting by email or other electronic methods) any material from the Site. You may, in any case, now and again, download as well as print one duplicate of individual pages of the Site for your own, non-business use, given that you keep flawless all copyright and other exclusive takes note.</p>
-
-    <h3>Your License to Us</h3>
-    <p>By posting or presenting any material (counting, without restriction, remarks, blog sections, photographs and recordings) to us through the Site, you acknowledge to the following: (i) that you are the proprietor of the material, or are making your posting or accommodation with the express assent of the proprietor of the material; and (ii) that you are thirteen years old or more.</p>
-    <p>Likewise, when you submit or post any material, you are allowing us, and anybody approved by us, a sovereignty free, never-ending, permanent, non-selective, unlimited, overall permit to utilize, duplicate, alter, transmit, sell, misuse, make subsidiary works from, disseminate, and additionally openly perform or show such material, in entire or to a limited extent, in any way or medium, presently known or in the future created, for any reason.</p>
-    <p>You recognize that COMPANY has the privilege however not the commitment to utilize and show any postings or commitments of any sort and that COMPANY may choose to stop the utilization and show of any such materials (or any segment thereof), whenever under any conditions.</p>
-
-    <h2>Limitations on Linking and Framing</h2>
-    <p>You may establish a hypertext link to the Site so long as the link does not state or imply any sponsorship of your site by us or by the Site. However, you may not, without our prior written permission, frame or link to any of the content of the Site, or incorporate into another website or other service any of our material, content or intellectual property.</p>
-
-    <h2>Disclaimers</h2>
-    <p>All through the Site, we may give connections and pointers to Internet locales kept up by outsiders. Our connection to such outsider destinations does not infer an underwriting or sponsorship of such locales, or the data, items or administrations offered on or through the destinations. Also, neither we nor partners work or control in any regard any data, items or administrations that outsiders may give on or through the Site or on sites connected to by us on the Site.</p>
-
-    <div class="legal-caps">THE INFORMATION, PRODUCTS AND SERVICES OFFERED ON OR THROUGH THE SITE AND BY COMPANY AND ANY THIRD-PARTY SITES ARE PROVIDED "AS IS" AND WITHOUT WARRANTIES OF ANY KIND EITHER EXPRESS OR IMPLIED. TO THE FULLEST EXTENT PERMISSIBLE PURSUANT TO APPLICABLE LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. WE DO NOT WARRANT THAT THE SITE OR ANY OF ITS FUNCTIONS WILL BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT ANY PART OF THIS SITE, INCLUDING BULLETIN BOARDS, OR THE SERVERS THAT MAKE IT AVAILABLE, ARE FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS.</div>
-
-    <p>You concur consistently to safeguard, repay and hold innocuous THE COMPANY its offshoots, their successors, transferees, appointees and licensees and their particular parent and auxiliary organizations, specialists, partners, officials, chiefs, investors and workers of each from and against any cases, reasons for activity, harms, liabilities, expenses and costs, including legitimate charges and costs, emerging out of or identified with your break of any commitment, guarantee, portrayal or agreement put forward in this.</p>
-
-    <h2>Purchases and Online Commerce</h2>
-    <p>On the off chance that you pay by check card, or Visa, you give us consent to naturally charge your acknowledge or platinum card as installment for your Program, Product or Service with no extra approval, for which you will get an electronic receipt.</p>
-    <p>If installment isn't gotten by the due date, you will have a three (3) day period to make the installment, generally the Program, Product or Services won't proceed and we maintain all authority to stop your entrance quickly and forever.</p>
-    <p>On the off chance that you neglect to make installment in an opportune way as per these Terms of Use or willfully choose to pull back from our Programs, Products or Services whenever or in any way, shape or reason, despite everything you will remain completely in charge of the full expense of the Programs, Products or potentially Services.</p>
-    <p>All data acquired during your buy or exchange for our Programs, Products and Services and the majority of the data that you give as a feature of the exchange, for example, your name, address, strategy for installment, Mastercard number, and charging data, might be gathered by both us and our installment preparing organization.</p>
-    <p>You consent to just buy products or administrations for yourself or for someone else for whom you are lawfully allowed to do as such or for whom you have acquired the express agreement to give their name, address, strategy for installment, Mastercard number, and charging data.</p>
-    <p>You consent to be monetarily in charge of all buys made by you or somebody following up for your sake. You consent to utilize our Programs, Products, Services, and Program Materials for real, non-business purposes just and not for theoretical, false, deceitful, or illicit purposes.</p>
-
-    <h2>Chargebacks</h2>
-    <p>Since we have a reasonable and unequivocal Refund Policy in these Terms of Use that you have consented to before finishing the purchase of any of our Programs, Products, or Services, we don't endure or acknowledge any sort of chargeback risk or real chargeback from your Visa organization. If a chargeback is set on a purchase or we get a chargeback danger during or after your buy, we maintain whatever authority is needed to report the occurrence to every one of the three credits detailing organizations or to some other substance for consideration in any chargeback database or for posting as a reprobate record which could negatively affect your credit report score.</p>
-
-    <h2>Third-Party Merchants</h2>
-    <p>On the off chance that you make a buy from one of our members, or some other individual or organization through a connection gave on or through our Programs, Products or Services ("Merchant"), all data got during your buy or exchange and the majority of the data that you give as a component of the exchange, for example, your Visa number and contact data, might be gathered by the trader and their installment preparing organization too.</p>
-    <p>You concur that we will not be mindful or subject to any misfortune, harm, discounts, or different issues of any kind that were brought about as the aftereffect of such dealings with a Merchant. You discharge us, our partners, our installment handling organization, and Merchants from any harms that you bring about, and make a deal to avoid declaring any cases against us or them, emerging from your buy through or utilization of our Website or its Content.</p>
-
-    <h2>Registration</h2>
-    <p>To access certain features of the Site, we may ask you to provide certain demographic information including your gender, year of birth, zip code and country. In addition, if you elect to sign-up for a particular feature of the Site, such as chat rooms, web logs, or bulletin boards, you may also be asked to register with us on the form provided and such registration may require you to provide personally identifiable information such as your name and email address.</p>
-    <p>You agree to provide true, accurate, current and complete information about yourself as prompted by the Site's registration form. If we have reasonable grounds to suspect that such information is untrue, inaccurate, or incomplete, we have the right to suspend or terminate your account and refuse any and all current or future use of the Site (or any portion thereof). Our use of any personally identifiable information you provide to us as part of the registration process is governed by the terms of our <a href="privacy-policy.html">Privacy Policy</a>.</p>
-
-    <h2>Passwords</h2>
-    <p>If you need a username and password to use certain features of the Site, you will receive a username and password through the Site's registration process. You are responsible for maintaining the confidentiality of the password and account, and are responsible for all activities (whether by you or by others) that occur under your password or account. You agree to notify us immediately of any unauthorized use of your password or account or any other breach of security, and to ensure that you exit from your account at the end of each session. We cannot and will not be liable for any loss or damage arising from your failure to protect your password or account information.</p>
-
-    <h2>Termination</h2>
-    <p>We may cancel or terminate your right to use the Site or any part of the Site at any time without notice. In the event of cancellation or termination, you are no longer authorized to access the part of the Site affected by such cancellation or termination. The restrictions imposed on you with respect to material downloaded from the Site, and the disclaimers and limitations of liabilities set forth in these Terms of Service, shall survive.</p>
-
-    <h2>Other</h2>
-    <p>This Agreement shall be binding upon and insure to the benefit of COMPANY and our respective assigns, successors, heirs, and legal representatives. Neither this Agreement nor any rights hereunder may be assigned without the prior written consent of COMPANY. Notwithstanding the foregoing, all rights and obligations under this Agreement may be freely assigned by COMPANY to any affiliated entity or any of its wholly owned subsidiaries.</p>
-    <p>These Terms of Use shall be governed by and construed in accordance with the laws of the province of India and any dispute shall be subject to binding arbitration in India. If any provision of this agreement shall be unlawful, void or for any reason unenforceable, then that provision shall be deemed severable from this agreement and shall not affect the validity and enforceability of any remaining provisions.</p>
-
-    <div class="contact-box">
-      <strong>Questions?</strong>
-      If you have any questions about these Terms &amp; Conditions, please contact us at <a href="mailto:support@manovikasa.com">support@manovikasa.com</a>
-    </div>
-  </div>
+<header class="ai-policy-header" style="text-align:center;">
+<div class="container">
+<a href="index.html"><img alt="AhanaPranayamaCenter" src="assets/logo.png" style="transform: scale(1.5); transform-origin: top center; display:inline-block;"/></a>
+<h1 style="text-align:center; margin-left:auto; margin-right:auto; display:none;">Terms &amp; Conditions</h1>
 </div>
-
-<!-- FOOTER -->
-<footer>
-  <p>© 2026 ManoVikasa — Champion Parenting · Built with love for Indian Families</p>
-  <p style="margin-top:6px;"><a href="privacy-policy.html">Privacy Policy</a> · <a href="refund-policy.html">Refund Policy</a> · <a href="terms.html">Terms &amp; Conditions</a></p>
+<h1 class="ai-center-title">Terms &amp; Conditions</h1></header>
+<main>
+<p>BY VISITING www.ahanapranayamacenter.com, OR BY PURCHASING PRODUCTS FROM www.ahanapranayamacenter.com, YOU ARE CONSENTING TO OUR TERMS OF SERVICE.</p><h2>GENERAL</h2><p>This site (the “Site”) is owned and developed by “AhanaPranayamaCenter” (“COMPANY,” “we” or “us”). By utilizing the Site, you consent to be bound by these Terms of Service and to utilize the Site as per these Terms of Service, our Privacy Policy and any extra terms and conditions that may apply to explicit areas of the Site or to items and administrations accessible through the Site or from COMPANY. Getting to the Site, in any way, regardless of whether robotized or something else, establishes utilization of the Site and your consent to be bound by these Terms of Service.</p><p>We maintain whatever authority is needed to change these Terms of Service or to force new conditions on utilization of the Site, when necessary, in which case we will post the updated Terms of Service on this site. By proceeding to utilize the Site after we post any such changes, you acknowledge the Terms of Service, as altered.</p><h2>INTELLECTUAL PROPERTY RIGHTS</h2><h2>Our Limited License to You.</h2><p>This Site and every one of the materials accessible on the Site are the property of us and additionally our partners or licensors, and are ensured by copyright, trademark, and other protected innovation laws. The Site is given exclusively to your own noncommercial use. You may not utilize the Site or the materials accessible on the Site in a way that establishes an encroachment of our rights or that has not been approved by us. All the more explicitly, except if unequivocally approved in these Terms of Service or by the proprietor of the materials, you may not alter, duplicate, imitate, republish, transfer, post, transmit, decipher, sell, make subsidiary works, misuse, or convey in any way or medium (counting by email or other electronic methods) any material from the Site. You may, in any case, now and again, download as well as print one duplicate of individual pages of the Site for your own, non-business use, given that you keep flawless all copyright and other exclusive takes note.</p><h2>Your License to Us.</h2><p>By posting or presenting any material (counting, without restriction, remarks, blog sections, photographs and recordings) to us through the Site, you acknowledge to the following : (I) that you are the proprietor of the material, or are making your posting or accommodation with the express assent of the proprietor of the material; and (ii) that you are thirteen years old or more. Likewise, when you submit or post any material, you are allowing us, and anybody approved by us, a sovereignty free, never-ending, permanent, non-selective, unlimited, overall permit to utilize, duplicate, alter, transmit, sell, misuse, make subsidiary works from, disseminate, and additionally openly perform or show such material, in entire or to a limited extent, in any way or medium, presently known or in the future created, for any reason. The prior award will incorporate the privilege to misuse any exclusive rights in such posting or accommodation, including, yet not constrained to, rights under copyright, trademark, administration imprint or patent laws under any significant ward. Additionally, regarding the activity of such rights, you award us, and anybody approved by us, the privilege to recognize you as the creator of any of your postings or entries by name, email address or screen name, as we consider proper. You recognize and concur that any commitments initially made by you for us will be considered a “work made for contract” when the work performed is inside the extent of the meaning of a work made for contract in the Copyright © 2025 KreedaLoka Private Limited | All Rights Reserved.</div>
 </footer>
-
 </body>
 </html>
