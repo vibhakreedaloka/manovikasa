@@ -1,97 +1,217 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width,initial-scale=1" name="viewport"/>
-<title>Refund Policy – AhanaPranayamaCenter</title>
-<link href="assets/16x16.png" rel="icon" sizes="16x16"/>
-<link href="assets/32x32.png" rel="icon" sizes="32x32"/>
-<link href="assets/180x180.png" rel="apple-touch-icon" sizes="180x180"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refund Policy — ManoVikasa</title>
+<link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png">
+<meta property="og:title" content="Refund Policy — ManoVikasa">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-    :root{ --ink:#0b1220; --cta:#2563eb; }
-    body{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; margin:0; color:var(--ink); background:#fff; }
-    header{ padding:18px 16px; border-bottom:1px solid #eee; }
-    header .container{ max-width:1024px; margin:0 auto; display:flex; align-items:center; gap:14px; }
-    header img{ height:50px; }
-    main{ max-width:880px; margin:32px auto; padding:0 16px 60px; }
-    h1{ font-size:30px; margin:6px 0 18px; font-weight:900; }
-    h2{ font-size:20px; font-weight:800; margin:22px 0 10px; line-height:1.35; }
-    h3{ font-size:18px; font-weight:700; margin:14px 0 8px; }
-    p{ line-height:1.7; margin:12px 0; }
-    a{ color:var(--cta); }
-    footer{ border-top:1px solid #eee; padding:18px 16px; }
-    footer .container{ max-width:1024px; margin:0 auto; font-size:14px; color:#6b7280; text-align:center; }
-  </style>
-<style id="ai-patch-0916">/* AI Patch 2025-09-16 */
-@media (max-width: 640px){
-  header.site-header .nav-cta a .mobile-break { display:block; }
-  header.site-header .nav-cta a { white-space: normal; display:inline-block; line-height:1.1; text-align:center; padding-left:0.75rem; padding-right:0.75rem; }
-  .hero .headline { text-align:center; }
-  .hero .hero-top { text-align:center; }
-  .hero .hero-subline { text-align:center; }
-}
-.hero .headline { text-align:center; } /* ensure desktop too */
-.hero .hero-top { text-align:center; }
-.hero .hero-guarantee { text-align:center; font-size:120%; }
-.hero .hero-subline { font-size:120%; }
-.footer-bar { position:relative; background:#f6f8fa; border-top:1px solid #e5e7eb; padding:12px 16px; font-size:14px; color:#111827; }
-.footer-bar .center-text { text-align:center; }
-.footer-bar .right-links { position:absolute; right:16px; top:50%; transform:translateY(-50%); display:flex; gap:4px; flex-direction:column; text-align:right; }
-.footer-bar .right-links a { text-decoration:none; color:#0f172a; }
-@media (max-width: 640px){
-  .footer-bar { padding-bottom: 16px; }
-}
-/* End AI Patch */</style><style id="ai-policy-center">/* Policy header centering */
-header.ai-policy-header{
-  display:grid !important;
-  grid-template-columns: 1fr auto 1fr !important;
-  align-items:center !important;
-  position:relative;
-}
-header.ai-policy-header .ai-center-title{
-  grid-column: 1 / -1;
-  justify-self:center;
-  text-align:center;
-  margin:0 auto;
-}
-@media (max-width: 640px){
-  header.ai-policy-header{ grid-template-columns: 1fr auto 1fr; }
-}
-@media (max-width: 640px){
-  header.ai-policy-header{
-    grid-template-columns: 1fr !important;
-    grid-template-rows: auto auto !important;
-    row-gap: 8px !important;
-    padding-top: 8px !important;
-    padding-bottom: 8px !important;
+  :root {
+    --navy: #1B3A6B;
+    --navy-deep: #0F2347;
+    --navy-mid: #2A4F8A;
+    --orange: #E8832A;
+    --orange-light: #F5A455;
+    --orange-dark: #C46820;
+    --cream: #FFF8F0;
+    --cream-dark: #F5EDE0;
+    --text-dark: #1A1A1A;
+    --text-mid: #444444;
+    --text-light: #777777;
+    --white: #FFFFFF;
+    --green: #2E7D52;
+    --border: #E0D8CF;
   }
-  header.ai-policy-header .ai-center-title{
-    grid-column: 1 !important;
-    grid-row: 2 !important;
-    margin-top: 6px !important;
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text-dark); min-height: 100vh; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    background: var(--navy-deep);
+    color: #fff;
+    text-align: center;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
   }
-  header.ai-policy-header img{
-    transform: scale(1.0) !important;
-    max-height: 56px !important;
-    height: auto !important;
+  .topbar span { color: var(--orange-light); }
+
+  /* ── NAV ── */
+  nav {
+    background: var(--white);
+    padding: 14px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
   }
-}</style><link rel="icon" type="image/png" sizes="16x16" href="assets/16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/32x32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="assets/180x180.png">
+  .nav-logo { height: 44px; }
+  .nav-back {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--navy);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+  }
+  .nav-back:hover { color: var(--orange); }
+
+  /* ── CONTENT ── */
+  .page-wrap {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 20px 64px;
+  }
+
+  .content-card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 44px 40px;
+    box-shadow: 0 8px 40px rgba(27,58,107,0.12);
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+
+  .content-card h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(24px, 3.5vw, 32px);
+    font-weight: 800;
+    color: var(--navy);
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .content-card .subtitle {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .content-card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-top: 32px;
+    margin-bottom: 12px;
+  }
+
+  .content-card p {
+    font-size: 15px;
+    color: var(--text-mid);
+    line-height: 1.75;
+    margin-bottom: 16px;
+  }
+
+  .content-card a {
+    color: var(--orange);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .content-card a:hover { text-decoration: underline; }
+
+  .highlight-box {
+    background: var(--cream-dark);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 24px 0;
+    font-size: 14px;
+    color: var(--text-mid);
+    line-height: 1.7;
+  }
+  .highlight-box strong { color: var(--navy); }
+
+  .contact-box {
+    background: rgba(27,58,107,0.06);
+    border-left: 3px solid var(--orange);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin-top: 28px;
+    font-size: 14px;
+    color: var(--text-mid);
+    line-height: 1.65;
+  }
+  .contact-box strong { color: var(--navy); display: block; margin-bottom: 4px; font-size: 15px; }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--navy-deep);
+    padding: 24px 40px;
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    border-top: 3px solid var(--orange);
+  }
+  footer a { color: rgba(255,255,255,0.6); text-decoration: none; }
+  footer a:hover { color: rgba(255,255,255,0.85); }
+
+  @media (max-width: 600px) {
+    .content-card { padding: 28px 20px; }
+    nav { padding: 14px 16px; }
+  }
+</style>
 </head>
 <body>
-<header class="ai-policy-header" style="text-align:center;">
-<div class="container">
-<a href="index.html"><img alt="AhanaPranayamaCenter" src="assets/logo.png" style="transform: scale(1.5); transform-origin: top center; display:inline-block;"/></a>
-<h1 style="text-align:center; margin-left:auto; margin-right:auto; display:none;">Refund Policy</h1>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html"><img src="images/manovikasa-logo_no_bg_dark_text.png" alt="ManoVikasa Champion Parenting" class="nav-logo"></a>
+  <a href="index.html" class="nav-back">← Back to Home</a>
+</nav>
+
+<!-- CONTENT -->
+<div class="page-wrap">
+  <div class="content-card">
+    <h1>Refund Policy</h1>
+    <p class="subtitle">We want you to be satisfied with your purchase. Here's how our refund process works.</p>
+
+    <p>We at <a href="https://www.manovikasa.com">www.manovikasa.com</a> want you to be satisfied with your purchase of any of our products. If you have any questions or problems, please let us know by contacting our support team directly at <a href="mailto:support@manovikasa.com">support@manovikasa.com</a>.</p>
+
+    <h2>How Refunds Work</h2>
+    <p>If you couldn't get the desired results with any of our products, contact our support team. Show us you really took every necessary step by presenting ALL the work that you completed. We will review it and endeavour to help resolve the issue. If you have taken the necessary steps and are not getting results, we will work with you one-on-one to help you achieve results. If we are unable to help, we will issue a FULL refund.</p>
+
+    <h2>Refund Eligibility</h2>
+    <p>To be eligible for a refund, you must submit your request and completed homework before 11:59 PM Indian Standard Time on the 60th day following the end of the particular program. After you submit your materials, all refunds are discretionary*.</p>
+    <p>No refunds will be provided more than 60 days following the date of end of the particular program. There will be no exceptions.</p>
+
+    <h2>Payment Plans</h2>
+    <p>If you opted for a payment plan, all payments must be completed. You may not cancel part way through. This is done to avoid fraud.</p>
+    <p>If the payment plan is not completed on time, we will pursue it with a collection agency until the entire payment plan is made. Additional fees and fines might apply in this case.</p>
+
+    <h2>Full Payment &amp; Course Completion</h2>
+    <p>If you pay in full or choose the payment plan and take the course and implement the strategy, then there will be no refunds issued and you must complete the payment plan if you selected one.</p>
+
+    <div class="highlight-box">
+      <strong>*Note:</strong> All refunds are discretionary. If you just downloaded the training material (PDFs, audios, videos, etc.) and then promptly asked for a refund, we reserve the right to deny your refund request. The purpose of this policy is to allow individuals to attempt the framework, and if it doesn't work, they can recover the amount they invested. It was not intended to allow individuals to take the training material and then request a refund a few days later.
+    </div>
+
+    <p>Furthermore, if it is clear that your homework/tasks are incomplete or that you did not implement the strategies taught in the course, your refund will be denied. However, we will still help and support you in order to get you results.</p>
+
+    <p>By purchasing, downloading or viewing any of our products you are also agreeing with our refund policy and terms &amp; conditions.</p>
+
+    <div class="contact-box">
+      <strong>Have Any More Questions?</strong>
+      Contact us at <a href="mailto:support@manovikasa.com">support@manovikasa.com</a>
+    </div>
+  </div>
 </div>
-<h1 class="ai-center-title">Refund Policy</h1></header>
-<main>
-<p>We at www.ahanapranayamacenter.com want you to be satisfied with your purchase of any of our products.</p><p>If you have any questions or problems, please let us know by contacting our support team directly. – support@ahanapranayamacenter.com.</p><p>If you couldn’t get the desired results with any of our products, contact our help group, show us you really took every necessary step by presenting ALL the work that you finished. We will survey it and endeavour to help right the issue. In the event that you have taken the necessary steps, and are not getting results, we will work with you one on one to enable you to accomplish results. In the event that we couldn’t help, we’ll issue a FULL refund.</p><p>To be eligible for a refund, you must submit your request and complete homework before 11:59pm Indian Standard Time on the 60th day following the end of the particular program. After you submit your materials, all refunds are discretionary*.</p><p>No refunds will be provided more than 60 days following the date of end of the particular program. There will be no exceptions.</p><p>If you opted for a payment plan, all payments must be completed. You may not cancel part way through. This is done to avoid fraud.</p><p>*Note: All refunds are discretionary. If you just downloaded the training material (pdfs, audios, videos, and/or etc), and then promptly asked for a refund, we reserve the right to deny your refund request.</p><p>The purpose of this policy is to allow individuals to attempt the framework, and on the off chance that it doesn’t work, they can recover the amount they invested. It wasn’t intended to allow individuals to take the preparation material and after that request a refund a couple of days later.</p><p>If you pay in full or choose the payment plan and take the course, implement the strategy, then there will be no refunds issued and you must complete the payment plan if you selected one.</p><p>If the payment plan is not completed on time, we will pursue it with a collection agency until the entire payment plan is made. Additional fees and fines might apply in this case.</p><p>Furthermore, if it is clear that your homework/ tasks are incomplete or that you did not implement the strategies taught in the course, your refund will be denied. However, we will still help and support you in order to get you results.</p><p>By purchasing, downloading or viewing any of our products you are also agreeing with our refund policy / terms and conditions.</p><p>Have any more questions?</p><p>Contact us: support@ahanapranayamacenter.com</p>
-</main>
+
+<!-- FOOTER -->
 <footer>
-<div class="container">Copyright © 2025 KreedaLoka Private Limited | All Rights Reserved.</div>
+  <p>© 2026 ManoVikasa — Champion Parenting · Built with love for Indian Families</p>
+  <p style="margin-top:6px;"><a href="privacy-policy.html">Privacy Policy</a> · <a href="refund-policy.html">Refund Policy</a> · <a href="terms.html">Terms &amp; Conditions</a></p>
 </footer>
+
 </body>
 </html>
