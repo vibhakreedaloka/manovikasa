@@ -889,12 +889,37 @@ input[type="date"]:focus { border-color: var(--gold); }
 <div class="page" id="page-setup">
 
   <div class="card">
-    <div class="card-title">🔗 Google Sheets URL</div>
+    <div class="card-title">🔗 Google Sheets Connection</div>
+
+    <!-- Status banner -->
+    <div id="urlStatus" style="font-size:13px; margin-bottom:14px; padding:10px 12px; background:var(--cream-dark); border-radius:10px; line-height:1.5;">
+      Checking…
+    </div>
+
+    <!-- Device-only fallback -->
     <div class="setup-field">
-      <label>Apps Script Web App URL</label>
+      <label>Enter URL manually <span style="font-weight:400;color:#B0A080;font-size:11px;">(saves on this device only)</span></label>
       <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/…/exec" />
     </div>
-    <button class="setup-save-btn" onclick="saveSettings()">💾 Save URL</button>
+    <button class="setup-save-btn" onclick="saveSettings()">💾 Save for This Device</button>
+  </div>
+
+  <div class="card steps">
+    <div class="card-title">🌐 Make It Work on All Devices</div>
+    <p style="font-size:13px; line-height:1.6; margin-bottom:12px; color:var(--brown);">
+      Since the app is a plain HTML file, the easiest way to share the URL across all phones/devices is to <strong>paste it directly into the file</strong>.
+    </p>
+    <ol>
+      <li>Open <strong>havyaka_stall_tracker.html</strong> in any text editor (Notepad, TextEdit, VS Code, etc.).</li>
+      <li>Find this line near the top of the <code>&lt;script&gt;</code> section:<br/>
+        <code style="background:var(--cream-dark);padding:3px 7px;border-radius:5px;font-size:12px;">const HARDCODED_URL = '';</code>
+      </li>
+      <li>Replace the empty quotes with your Apps Script URL:<br/>
+        <code style="background:var(--cream-dark);padding:3px 7px;border-radius:5px;font-size:12px;">const HARDCODED_URL = 'https://script.google.com/…';</code>
+      </li>
+      <li>Save the file and re-upload it to wherever you're hosting it.</li>
+      <li>Done — every device that opens the page will now connect automatically. ✅</li>
+    </ol>
   </div>
 
   <div class="card steps">
@@ -956,6 +981,18 @@ const COL_MAP = {
 
 const CHART_COLORS = ['#3D6338','#C4961A','#8B4513','#6B9E65','#5C3010','#E2B840'];
 
+// ─── PASTE YOUR APPS SCRIPT URL HERE ───────────────────────────────────────
+// This makes the URL work on ALL devices without anyone needing to enter it.
+// Replace the empty string below with your URL, save, and re-upload the file.
+const HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbzQb9h4EkXB2SN2QeaIwtZzCGAemP1sSSP2dSFpqP7lUQ0YK_FjAwuW5BR-P8F6meg/exec';
+// ───────────────────────────────────────────────────────────────────────────
+
+// Returns the URL to use: hardcoded takes priority, then localStorage fallback
+function getScriptUrl() {
+  if (HARDCODED_URL && HARDCODED_URL.trim()) return HARDCODED_URL.trim();
+  return localStorage.getItem('scriptUrl') || '';
+}
+
 /* ═══════════════════════════
    STATE
 ═══════════════════════════ */
@@ -977,9 +1014,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const dd    = String(today.getDate()).padStart(2,'0');
   document.getElementById('purchaseDate').value = `${yyyy}-${mm}-${dd}`;
 
-  // Load saved URL
-  const url = localStorage.getItem('scriptUrl') || '';
-  document.getElementById('scriptUrl').value = url;
+  // Populate Setup field — show whichever URL is active
+  const activeUrl = getScriptUrl();
+  document.getElementById('scriptUrl').value = localStorage.getItem('scriptUrl') || '';
+  updateUrlStatus(activeUrl);
 
   // Inject script code
   document.getElementById('codeBlock').textContent = APPS_SCRIPT_CODE;
@@ -1056,7 +1094,7 @@ async function savePurchase() {
   const total = calcTotal();
   if (total === 0) { toast('Please select at least one item.'); return; }
 
-  const scriptUrl = localStorage.getItem('scriptUrl') || '';
+  const scriptUrl = getScriptUrl();
   if (!scriptUrl) { toast('⚠️ Set up the Google Sheets URL in Setup tab first!'); return; }
 
   const data = {
@@ -1110,14 +1148,30 @@ function resetForm() {
 function saveSettings() {
   const url = document.getElementById('scriptUrl').value.trim();
   localStorage.setItem('scriptUrl', url);
-  toast('✅ URL saved!');
+  updateUrlStatus(getScriptUrl());
+  toast('✅ URL saved! Works on this device now.');
+}
+
+function updateUrlStatus(url) {
+  const el = document.getElementById('urlStatus');
+  if (!el) return;
+  if (HARDCODED_URL && HARDCODED_URL.trim()) {
+    el.innerHTML = '✅ <strong>Hardcoded URL active</strong> — works on all devices automatically.';
+    el.style.color = '#3D6338';
+  } else if (url) {
+    el.innerHTML = '⚠️ <strong>Saved on this device only</strong> (localStorage). To make it work on all devices, paste the URL into the HTML file — see instructions below.';
+    el.style.color = '#8B4513';
+  } else {
+    el.innerHTML = '❌ <strong>No URL set.</strong> Enter your Apps Script URL below.';
+    el.style.color = '#C0392B';
+  }
 }
 
 /* ═══════════════════════════
    DASHBOARD
 ═══════════════════════════ */
 async function loadDashboard() {
-  const scriptUrl = localStorage.getItem('scriptUrl') || '';
+  const scriptUrl = getScriptUrl();
   if (!scriptUrl) { toast('⚠️ Set up the Google Sheets URL in Setup tab first!'); return; }
 
   showLoading(true);
