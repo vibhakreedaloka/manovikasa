@@ -807,8 +807,8 @@ input[type="date"]:focus { border-color: var(--gold); }
   <div class="card">
     <div class="card-title">💳 Payment Mode</div>
     <div class="toggle-pair">
-      <button class="tog on-green" id="payCash" onclick="setPay('cash')">💵 Cash</button>
-      <button class="tog" id="payOnline" onclick="setPay('online')">📱 Online</button>
+      <button class="tog" id="payCash" onclick="setPay('cash')">💵 Cash</button>
+      <button class="tog on-green" id="payOnline" onclick="setPay('online')">📱 Online</button>
     </div>
   </div>
 
@@ -998,7 +998,7 @@ function getScriptUrl() {
 ═══════════════════════════ */
 let qty       = { neerShot:0, neerFull:0, hunase:0, halfHunase:0, mandan200:0, mandan500:0 };
 let custType  = 'normal';
-let payMode   = 'cash';
+let payMode   = 'online';
 let selDay    = 'all';
 let allRows   = [];
 let myCharts  = {};
