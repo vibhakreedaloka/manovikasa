@@ -807,8 +807,8 @@ input[type="date"]:focus { border-color: var(--gold); }
   <div class="card">
     <div class="card-title">💳 Payment Mode</div>
     <div class="toggle-pair">
-      <button class="tog" id="payCash" onclick="setPay('cash')">💵 Cash</button>
       <button class="tog on-green" id="payOnline" onclick="setPay('online')">📱 Online</button>
+      <button class="tog" id="payCash" onclick="setPay('cash')">💵 Cash</button>
     </div>
   </div>
 
@@ -1138,7 +1138,7 @@ function resetForm() {
   document.getElementById('custPhone').value = '';
   document.getElementById('socialMedia').value = '';
   setCustType('normal');
-  setPay('cash');
+  setPay('online');
   updateSaveBtn();
 }
 
