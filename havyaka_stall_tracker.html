@@ -779,6 +779,18 @@ input[type="date"]:focus { border-color: var(--gold); }
 
     <div class="item-row">
       <div class="item-info">
+        <div class="item-name">Mandan Gojju 100g</div>
+        <div class="item-price">₹149 each</div>
+      </div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="chQty('mandan100',-1)">−</button>
+        <span class="qty-num" id="q-mandan100">0</span>
+        <button class="qty-btn" onclick="chQty('mandan100',1)">+</button>
+      </div>
+    </div>
+
+    <div class="item-row">
+      <div class="item-info">
         <div class="item-name">Mandan Gojju 200g</div>
         <div class="item-price">₹249 each</div>
       </div>
@@ -798,6 +810,30 @@ input[type="date"]:focus { border-color: var(--gold); }
         <button class="qty-btn" onclick="chQty('mandan500',-1)">−</button>
         <span class="qty-num" id="q-mandan500">0</span>
         <button class="qty-btn" onclick="chQty('mandan500',1)">+</button>
+      </div>
+    </div>
+
+    <div class="item-row">
+      <div class="item-info">
+        <div class="item-name">Mango Gula 100g</div>
+        <div class="item-price">₹149 each</div>
+      </div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="chQty('mangoGula100',-1)">−</button>
+        <span class="qty-num" id="q-mangoGula100">0</span>
+        <button class="qty-btn" onclick="chQty('mangoGula100',1)">+</button>
+      </div>
+    </div>
+
+    <div class="item-row">
+      <div class="item-info">
+        <div class="item-name">Mango Gula 250g</div>
+        <div class="item-price">₹249 each</div>
+      </div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="chQty('mangoGula250',-1)">−</button>
+        <span class="qty-num" id="q-mangoGula250">0</span>
+        <button class="qty-btn" onclick="chQty('mangoGula250',1)">+</button>
       </div>
     </div>
 
@@ -965,18 +1001,24 @@ const ITEMS = {
   neerFull:   { label: 'Neer Gojju Full',             shortLabel: 'NG Full',    price: 70  },
   hunase:     { label: 'Hunase Hannina Paanaka',      shortLabel: 'Hunase',     price: 50  },
   halfHunase: { label: 'Half Hunase H. Paanaka',      shortLabel: 'Half Hunase',price: 30  },
+  mandan100:  { label: 'Mandan Gojju 100g',           shortLabel: 'Mandan 100', price: 149 },
   mandan200:  { label: 'Mandan Gojju 200g',           shortLabel: 'Mandan 200', price: 249 },
   mandan500:  { label: 'Mandan Gojju 500g',           shortLabel: 'Mandan 500', price: 499 },
+  mangoGula100: { label: 'Mango Gula 100g',           shortLabel: 'Gula 100',   price: 149 },
+  mangoGula250: { label: 'Mango Gula 250g',           shortLabel: 'Gula 250',   price: 249 },
 };
 
 // Column names in Google Sheet
 const COL_MAP = {
-  neerShot:   'NeerGojjuShot',
-  neerFull:   'NeerGojjuFull',
-  hunase:     'HunaseHannina',
-  halfHunase: 'HalfHunaseHannina',
-  mandan200:  'MandanGojju200',
-  mandan500:  'MandanGojju500',
+  neerShot:     'NeerGojjuShot',
+  neerFull:     'NeerGojjuFull',
+  hunase:       'HunaseHannina',
+  halfHunase:   'HalfHunaseHannina',
+  mandan100:    'MandanGojju100',
+  mandan200:    'MandanGojju200',
+  mandan500:    'MandanGojju500',
+  mangoGula100: 'MangoGula100',
+  mangoGula250: 'MangoGula250',
 };
 
 const CHART_COLORS = ['#3D6338','#C4961A','#8B4513','#6B9E65','#5C3010','#E2B840'];
@@ -996,7 +1038,7 @@ function getScriptUrl() {
 /* ═══════════════════════════
    STATE
 ═══════════════════════════ */
-let qty       = { neerShot:0, neerFull:0, hunase:0, halfHunase:0, mandan200:0, mandan500:0 };
+let qty       = { neerShot:0, neerFull:0, hunase:0, halfHunase:0, mandan100:0, mandan200:0, mandan500:0, mangoGula100:0, mangoGula250:0 };
 let custType  = 'normal';
 let payMode   = 'online';
 let selDay    = 'all';
@@ -1386,10 +1428,11 @@ function getOrCreateSheet(ss) {
       'CustomerType', 'SocialMedia',
       'NeerGojjuShot', 'NeerGojjuFull',
       'HunaseHannina', 'HalfHunaseHannina',
-      'MandanGojju200', 'MandanGojju500',
+      'MandanGojju100', 'MandanGojju200', 'MandanGojju500',
+      'MangoGula100', 'MangoGula250',
       'TotalAmount', 'PaymentMode'
     ]);
-    sheet.getRange(1,1,1,14).setFontWeight('bold');
+    sheet.getRange(1,1,1,17).setFontWeight('bold');
     sheet.setFrozenRows(1);
   }
   return sheet;
@@ -1407,12 +1450,15 @@ function doGet(e) {
         d.timestamp,          d.date,
         d.customerName || '', d.phone || '',
         d.customerType,       d.socialMedia || '',
-        d.items.neerShot    || 0,
-        d.items.neerFull    || 0,
-        d.items.hunase      || 0,
-        d.items.halfHunase  || 0,
-        d.items.mandan200   || 0,
-        d.items.mandan500   || 0,
+        d.items.neerShot      || 0,
+        d.items.neerFull      || 0,
+        d.items.hunase        || 0,
+        d.items.halfHunase    || 0,
+        d.items.mandan100     || 0,
+        d.items.mandan200     || 0,
+        d.items.mandan500     || 0,
+        d.items.mangoGula100  || 0,
+        d.items.mangoGula250  || 0,
         d.totalAmount,        d.paymentMode
       ]);
       return ok({success: true});
