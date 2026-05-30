@@ -901,7 +901,7 @@ input[type="date"]:focus { border-color: var(--gold); }
     </div>
   </div>
 
-  <!-- Revenue chart -->
+  <!-- Revenue by individual item chart -->
   <div class="card">
     <div class="card-title">💰 Revenue by Item</div>
     <div class="chart-wrap">
@@ -909,11 +909,19 @@ input[type="date"]:focus { border-color: var(--gold); }
     </div>
   </div>
 
-  <!-- Payment chart -->
+  <!-- Revenue by category chart -->
   <div class="card">
-    <div class="card-title">💳 Cash vs Online</div>
-    <div class="chart-wrap doughnut">
-      <canvas id="chartPayment"></canvas>
+    <div class="card-title">🗂️ Revenue by Category</div>
+    <div class="chart-wrap">
+      <canvas id="chartCategory"></canvas>
+    </div>
+  </div>
+
+  <!-- Cash vs Online by orders chart -->
+  <div class="card">
+    <div class="card-title">💳 Cash vs Online — No. of Orders</div>
+    <div class="chart-wrap">
+      <canvas id="chartPaymentOrders"></canvas>
     </div>
   </div>
 
@@ -1315,7 +1323,24 @@ function renderDash() {
 
   drawBar('chartCount',   labels, keys.map(k => counts[k]),   'Qty Sold');
   drawBar('chartRevenue', labels, keys.map(k => revenues[k]), '₹ Revenue');
-  drawDoughnut('chartPayment', ['Cash','Online','Influencer'], [cashRevenue, onlineRevenue, infRevenue]);
+
+  // Category revenue: merged groups
+  const catRevenue = {
+    'Neer Gojju':   revenues.neerShot   + revenues.neerFull,
+    'Hunase':       revenues.hunase     + revenues.halfHunase,
+    'Mandan Gojju': revenues.mandan100  + revenues.mandan200  + revenues.mandan500,
+    'Mango Gula':   revenues.mangoGula100 + revenues.mangoGula250,
+  };
+  drawBar('chartCategory', Object.keys(catRevenue), Object.values(catRevenue), '₹ Revenue');
+
+  // Cash vs Online by number of orders
+  const cashOrders   = payingRows.filter(r => r.PaymentMode === 'cash').length;
+  const onlineOrders = payingRows.filter(r => r.PaymentMode === 'online').length;
+  const infOrders    = infRows.length;
+  drawGroupedBar('chartPaymentOrders',
+    ['Cash', 'Online', 'Influencer'],
+    [cashOrders, onlineOrders, infOrders]
+  );
 }
 
 function drawBar(id, labels, data, yLabel) {
@@ -1351,34 +1376,44 @@ function drawBar(id, labels, data, yLabel) {
   });
 }
 
-function drawDoughnut(id, labels, data) {
+function drawGroupedBar(id, labels, data) {
   if (myCharts[id]) { myCharts[id].destroy(); }
   const ctx = document.getElementById(id).getContext('2d');
   myCharts[id] = new Chart(ctx, {
-    type: 'doughnut',
+    type: 'bar',
     data: {
       labels,
       datasets: [{
         data,
         backgroundColor: [var_('--green'), var_('--gold'), '#C0392B'],
-        borderWidth: 3,
-        borderColor: '#FDF6E8',
-        hoverBorderWidth: 3,
+        borderRadius: 7,
+        borderSkipped: false,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '60%',
       plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { font: { family: 'Nunito', size: 12 }, color: '#5C3010', padding: 16 }
-        },
+        legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => ` ₹${fmt(ctx.parsed)} — ${ctx.label}`
+            label: (ctx) => ` ${ctx.parsed.y} orders — ${ctx.label}`
           }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            font: { family: 'Nunito', size: 11 },
+            color: '#A09070'
+          },
+          grid: { color: 'rgba(0,0,0,.06)' }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'Nunito', size: 13 }, color: '#7A6040' }
         }
       }
     }
