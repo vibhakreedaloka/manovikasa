@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .mela-card {
+      background: var(--cream-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .mela-card-main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    .mela-card-main:active { background: var(--cream-dark); }
+    .mela-icon {
+      width: 48px; height: 48px;
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; flex-shrink: 0;
+    }
+    .mela-info { flex: 1; min-width: 0; }
+    .mela-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px; color: var(--brown-dark);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .mela-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .mela-arrow { color: var(--border-strong); font-size: 22px; flex-shrink: 0; }
+    .mela-actions {
+      display: flex;
+      border-top: 1px solid var(--border);
+      background: var(--cream);
+    }
+    .mela-act-btn {
+      flex: 1; padding: 10px 8px;
+      border: none; background: none;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; color: var(--brown-mid);
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      transition: background var(--transition);
+    }
+    .mela-act-btn:not(:last-child) { border-right: 1px solid var(--border); }
+    .mela-act-btn:active { background: var(--cream-dark); }
+    .mela-act-btn.danger { color: var(--red); }
+    .archive-footer {
+      text-align: center;
+      padding: 16px;
+      margin-bottom: 80px;
+    }
+    .archive-footer a {
+      font-size: 13px; font-weight: 600;
+      color: var(--text-muted); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Home Header -->
+  <header class="hs-home-header">
+    <img src="assets/Havyaka_Swaada_English_Logo.png" class="hs-home-logo" alt="Havyaka Swaada" />
+    <p class="hs-home-tagline">Stall Tracker</p>
+  </header>
+
+  <!-- Mela List -->
+  <main class="hs-page" id="melaList" style="padding-bottom:20px;">
+    <div class="hs-empty">
+      <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+      <div class="hs-empty-sub">Loading melas…</div>
+    </div>
+  </main>
+
+  <!-- Archive Link -->
+  <div class="archive-footer">
+    <a onclick="HS.navigate('mela-archive.html')">📦 View Archived Melas</a>
+  </div>
+
+  <!-- FAB: Add Mela -->
+  <button class="hs-fab hs-fab-gold" onclick="openModal('add')" aria-label="Add Mela"
+    style="bottom:24px;">+</button>
+
+  <!-- ADD / EDIT MODAL -->
+  <div class="hs-modal-bg" id="melaModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="modalTitle">Add New Mela</div>
+      <input type="hidden" id="fMelaId" />
+
+      <div class="hs-field">
+        <label class="hs-label">Mela Name *</label>
+        <input class="hs-input" type="text" id="fName" placeholder="e.g. Mango Mela 2026" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Area *</label>
+        <input class="hs-input" type="text" id="fArea" placeholder="e.g. JP Nagar, Bengaluru" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Organiser Name <span class="hs-opt">optional</span></label>
+        <input class="hs-input" type="text" id="fOrganiser" placeholder="Organisation or person" />
+      </div>
+      <div class="hs-input-row">
+        <div class="hs-field">
+          <label class="hs-label">Contact Person <span class="hs-opt">optional</span></label>
+          <input class="hs-input" type="text" id="fContact" placeholder="Name" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Phone <span class="hs-opt">optional</span></label>
+          <input class="hs-input" type="tel" id="fPhone" placeholder="Number" />
+        </div>
+      </div>
+      <div class="hs-input-row">
+        <div class="hs-field">
+          <label class="hs-label">From Date</label>
+          <input class="hs-input" type="date" id="fDateFrom" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">To Date</label>
+          <input class="hs-input" type="date" id="fDateTo" />
+        </div>
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-gold hs-btn-full" onclick="saveMela()">💾 Save Mela</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('melaModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/common.js"></script>
+  <script>
+    let melas = [];
+
+    /* ── INIT ─────────────────────────────── */
+    async function init() {
+      HS.loading(true, 'Loading melas…');
+      try {
+        const res = await HS.api({ action: 'getMelas' });
+        melas = (res.data || []).map(m => ({
+          ...m,
+          DateFrom: HS.normDate(m.DateFrom),
+          DateTo:   HS.normDate(m.DateTo),
+        }));
+        renderList();
+      } catch(e) {
+        HS.toast('Could not load melas. Check connection.', 'error', true);
+        renderError();
+      } finally {
+        HS.loading(false);
+      }
+    }
+
+    /* ── RENDER ───────────────────────────── */
+    function renderList() {
+      const active = melas.filter(m => m.Status !== 'archived');
+      const el = document.getElementById('melaList');
+
+      if (!active.length) {
+        el.innerHTML = `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">🎪</div>
+            <div class="hs-empty-title">No Melas yet</div>
+            <div class="hs-empty-sub">Tap the + button to add your first mela.</div>
+          </div>`;
+        return;
+      }
+
+      el.innerHTML = `
+        <div class="hs-section-lbl">Your Melas</div>
+        ${active.map(melaCardHTML).join('')}`;
+    }
+
+    function renderError() {
+      document.getElementById('melaList').innerHTML = `
+        <div class="hs-empty">
+          <div class="hs-empty-icon">⚠️</div>
+          <div class="hs-empty-title">Could not load</div>
+          <div class="hs-empty-sub">
+            <button class="hs-btn hs-btn-secondary" onclick="init()" style="margin-top:12px;">
+              🔄 Retry
+            </button>
+          </div>
+        </div>`;
+    }
+
+    function melaCardHTML(m) {
+      const dates = (m.DateFrom && m.DateTo)
+        ? `${HS.shortDate(m.DateFrom)} – ${HS.shortDate(m.DateTo)}`
+        : m.DateFrom ? HS.shortDate(m.DateFrom) : '';
+      const sub = [m.Area, dates].filter(Boolean).join(' &nbsp;·&nbsp; ');
+
+      return `
+        <div class="mela-card">
+          <div class="mela-card-main" onclick="enterMela('${m.MelaId}')">
+            <div class="mela-icon">🎪</div>
+            <div class="mela-info">
+              <div class="mela-name">${m.MelaName}</div>
+              ${sub ? `<div class="mela-sub">${sub}</div>` : ''}
+            </div>
+            <span class="mela-arrow">›</span>
+          </div>
+          <div class="mela-actions" onclick="event.stopPropagation()">
+            <button class="mela-act-btn" onclick="openModal('edit','${m.MelaId}')">✏️ Edit</button>
+            <button class="mela-act-btn danger" onclick="doArchive('${m.MelaId}')">📦 Archive</button>
+          </div>
+        </div>`;
+    }
+
+    /* ── ENTER MELA ───────────────────────── */
+    async function enterMela(melaId) {
+      const mela = melas.find(m => m.MelaId === melaId);
+      if (!mela) return;
+      HS.setCurrentMela(mela);
+      HS.loading(true, 'Opening mela…');
+      try {
+        const res = await HS.api({ action: 'getMelaMenu', melaId });
+        const hasActive = (res.data || []).some(i => i.Status === 'active');
+        HS.navigate(hasActive ? 'log.html' : 'menu.html?setup=1');
+      } catch(e) {
+        HS.navigate('log.html');
+      } finally {
+        HS.loading(false);
+      }
+    }
+
+    /* ── MODAL ────────────────────────────── */
+    function openModal(mode, melaId) {
+      const m = melaId ? melas.find(x => x.MelaId === melaId) : null;
+      document.getElementById('modalTitle').textContent = m ? 'Edit Mela' : 'Add New Mela';
+      document.getElementById('fMelaId').value    = m ? m.MelaId       : '';
+      document.getElementById('fName').value      = m ? m.MelaName     : '';
+      document.getElementById('fArea').value      = m ? m.Area         : '';
+      document.getElementById('fOrganiser').value = m ? m.OrganiserName : '';
+      document.getElementById('fContact').value   = m ? m.ContactPerson : '';
+      document.getElementById('fPhone').value     = m ? m.ContactPhone  : '';
+      document.getElementById('fDateFrom').value  = m ? m.DateFrom      : '';
+      document.getElementById('fDateTo').value    = m ? m.DateTo        : '';
+      HS.openModal('melaModal');
+    }
+
+    /* ── SAVE MELA ────────────────────────── */
+    async function saveMela() {
+      const name = document.getElementById('fName').value.trim();
+      const area = document.getElementById('fArea').value.trim();
+      if (!name) { HS.toast('Mela Name is required.', 'error', true); return; }
+      if (!area) { HS.toast('Area is required.', 'error', true); return; }
+
+      const editId = document.getElementById('fMelaId').value;
+      const data = {
+        melaId:        editId || undefined,
+        name,
+        area,
+        organiser:     document.getElementById('fOrganiser').value.trim(),
+        contactPerson: document.getElementById('fContact').value.trim(),
+        contactPhone:  document.getElementById('fPhone').value.trim(),
+        dateFrom:      document.getElementById('fDateFrom').value,
+        dateTo:        document.getElementById('fDateTo').value,
+      };
+
+      HS.closeModal('melaModal');
+      HS.loading(true, editId ? 'Updating…' : 'Creating mela…');
+      try {
+        const res = await HS.api({ action: editId ? 'updateMela' : 'createMela', data: JSON.stringify(data) });
+        if (res.success) {
+          HS.toast(editId ? '✅ Mela updated!' : '✅ Mela created!', 'success', true);
+          await init();
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error', true);
+        }
+      } catch(e) {
+        HS.toast('Network error. Try again.', 'error', true);
+      } finally {
+        HS.loading(false);
+      }
+    }
+
+    /* ── ARCHIVE ──────────────────────────── */
+    async function doArchive(melaId) {
+      const m = melas.find(x => x.MelaId === melaId);
+      if (!m) return;
+      HS.confirm(`Archive "${m.MelaName}"? It will move to the archive.`, async () => {
+        HS.loading(true, 'Archiving…');
+        try {
+          const res = await HS.api({ action: 'archiveMela', melaId, status: 'archived' });
+          if (res.success) { HS.toast('Mela archived.', '', true); await init(); }
+          else HS.toast('Error: ' + (res.error || 'Unknown'), 'error', true);
+        } catch(e) {
+          HS.toast('Network error.', 'error', true);
+        } finally { HS.loading(false); }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

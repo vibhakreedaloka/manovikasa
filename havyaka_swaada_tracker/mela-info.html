@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Mela Info — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .info-row {
+      display: flex; gap: 10px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-lbl { font-size: 12px; font-weight: 700; color: var(--text-muted);
+                text-transform: uppercase; letter-spacing: .4px;
+                min-width: 110px; padding-top: 1px; }
+    .info-val { font-size: 14px; color: var(--brown-dark); font-weight: 600; flex: 1; }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page">
+
+    <!-- View Mode -->
+    <div id="viewMode">
+      <div class="hs-card" id="infoCard">
+        <div class="hs-card-title">🎪 Mela Details</div>
+        <!-- Populated by JS -->
+      </div>
+
+      <button class="hs-btn hs-btn-gold hs-btn-full hs-mb" onclick="showEditMode()">✏️ Edit Details</button>
+      <button class="hs-btn hs-btn-danger hs-btn-full" onclick="doArchive()">📦 Archive This Mela</button>
+    </div>
+
+    <!-- Edit Mode (hidden initially) -->
+    <div id="editMode" style="display:none;">
+      <div class="hs-card">
+        <div class="hs-card-title">✏️ Edit Mela Details</div>
+
+        <div class="hs-field">
+          <label class="hs-label">Mela Name *</label>
+          <input class="hs-input" type="text" id="fName" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Area *</label>
+          <input class="hs-input" type="text" id="fArea" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Organiser Name <span class="hs-opt">optional</span></label>
+          <input class="hs-input" type="text" id="fOrganiser" />
+        </div>
+        <div class="hs-input-row">
+          <div class="hs-field">
+            <label class="hs-label">Contact Person <span class="hs-opt">optional</span></label>
+            <input class="hs-input" type="text" id="fContact" />
+          </div>
+          <div class="hs-field">
+            <label class="hs-label">Phone <span class="hs-opt">optional</span></label>
+            <input class="hs-input" type="tel" id="fPhone" />
+          </div>
+        </div>
+        <div class="hs-input-row">
+          <div class="hs-field">
+            <label class="hs-label">From Date</label>
+            <input class="hs-input" type="date" id="fDateFrom" />
+          </div>
+          <div class="hs-field">
+            <label class="hs-label">To Date</label>
+            <input class="hs-input" type="date" id="fDateTo" />
+          </div>
+        </div>
+      </div>
+
+      <button class="hs-btn hs-btn-gold hs-btn-full hs-mb" onclick="saveEdit()">💾 Save Changes</button>
+      <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="cancelEdit()">Cancel</button>
+    </div>
+
+  </main>
+
+  <script src="assets/common.js"></script>
+  <script>
+    let mela = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      mela = HS.getCurrentMela();
+      if (!mela) { HS.navigate('index.html'); return; }
+      HS.renderSidebar('info');
+      HS.renderHeader({ title: 'Mela Info', subtitle: mela.MelaName, showMenu: true });
+      renderView();
+    });
+
+    /* ── VIEW ── */
+    function renderView() {
+      const rows = [
+        { lbl: 'Mela Name',    val: mela.MelaName },
+        { lbl: 'Area',         val: mela.Area },
+        { lbl: 'Organiser',    val: mela.OrganiserName || '—' },
+        { lbl: 'Contact',      val: mela.ContactPerson  || '—' },
+        { lbl: 'Phone',        val: mela.ContactPhone   || '—' },
+        { lbl: 'From Date',    val: HS.formatDate(mela.DateFrom) || '—' },
+        { lbl: 'To Date',      val: HS.formatDate(mela.DateTo)   || '—' },
+      ];
+      document.getElementById('infoCard').innerHTML = `
+        <div class="hs-card-title">🎪 Mela Details</div>
+        ${rows.map(r => `
+          <div class="info-row">
+            <span class="info-lbl">${r.lbl}</span>
+            <span class="info-val">${r.val}</span>
+          </div>`).join('')}
+      `;
+    }
+
+    /* ── EDIT ── */
+    function showEditMode() {
+      document.getElementById('viewMode').style.display = 'none';
+      document.getElementById('editMode').style.display = 'block';
+      document.getElementById('fName').value      = mela.MelaName      || '';
+      document.getElementById('fArea').value      = mela.Area           || '';
+      document.getElementById('fOrganiser').value = mela.OrganiserName  || '';
+      document.getElementById('fContact').value   = mela.ContactPerson  || '';
+      document.getElementById('fPhone').value     = mela.ContactPhone   || '';
+      document.getElementById('fDateFrom').value  = mela.DateFrom       || '';
+      document.getElementById('fDateTo').value    = mela.DateTo         || '';
+    }
+
+    function cancelEdit() {
+      document.getElementById('editMode').style.display = 'none';
+      document.getElementById('viewMode').style.display = 'block';
+    }
+
+    async function saveEdit() {
+      const name = document.getElementById('fName').value.trim();
+      const area = document.getElementById('fArea').value.trim();
+      if (!name) { HS.toast('Mela Name is required.', 'error'); return; }
+      if (!area) { HS.toast('Area is required.', 'error'); return; }
+
+      const data = {
+        melaId:        mela.MelaId,
+        name,  area,
+        organiser:     document.getElementById('fOrganiser').value.trim(),
+        contactPerson: document.getElementById('fContact').value.trim(),
+        contactPhone:  document.getElementById('fPhone').value.trim(),
+        dateFrom:      document.getElementById('fDateFrom').value,
+        dateTo:        document.getElementById('fDateTo').value,
+      };
+
+      HS.loading(true, 'Saving…');
+      try {
+        const res = await HS.api({ action: 'updateMela', data: JSON.stringify(data) });
+        if (res.success) {
+          // Update session mela
+          mela = { ...mela, MelaName: name, Area: area,
+            OrganiserName: data.organiser, ContactPerson: data.contactPerson,
+            ContactPhone: data.contactPhone, DateFrom: data.dateFrom, DateTo: data.dateTo };
+          HS.setCurrentMela(mela);
+          HS.toast('✅ Mela updated!', 'success');
+          cancelEdit();
+          renderView();
+          HS.renderHeader({ title: 'Mela Info', subtitle: mela.MelaName, showMenu: true });
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        }
+      } catch(e) {
+        HS.toast('Network error.', 'error');
+      } finally {
+        HS.loading(false);
+      }
+    }
+
+    /* ── ARCHIVE ── */
+    async function doArchive() {
+      HS.confirm(`Archive "${mela.MelaName}"? It will move to the archive.`, async () => {
+        HS.loading(true, 'Archiving…');
+        try {
+          const res = await HS.api({ action: 'archiveMela', melaId: mela.MelaId, status: 'archived' });
+          if (res.success) {
+            HS.toast('Mela archived.', '');
+            setTimeout(() => HS.navigate('index.html'), 1200);
+          } else {
+            HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+          }
+        } catch(e) {
+          HS.toast('Network error.', 'error');
+        } finally {
+          HS.loading(false);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
