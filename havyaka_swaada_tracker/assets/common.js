@@ -34,16 +34,15 @@ const HS = (() => {
   }
 
   /* ══════════════════════════════════════
-     CURRENT MELA  (session-scoped)
+     CURRENT MELA  (localStorage — survives phone lock & tab suspend)
   ══════════════════════════════════════ */
   function getCurrentMela() {
-    try {
-      return JSON.parse(sessionStorage.getItem('hs_current_mela') || 'null');
-    } catch { return null; }
+    try { return JSON.parse(localStorage.getItem('hs_current_mela') || 'null'); }
+    catch { return null; }
   }
 
   function setCurrentMela(mela) {
-    sessionStorage.setItem('hs_current_mela', JSON.stringify(mela));
+    localStorage.setItem('hs_current_mela', JSON.stringify(mela));
   }
 
   /* ══════════════════════════════════════

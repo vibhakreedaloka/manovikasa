@@ -144,23 +144,40 @@
   <script src="assets/common.js"></script>
   <script>
     let melas = [];
+    const MELAS_CACHE = 'hs_melas_cache';
 
     /* ── INIT ─────────────────────────────── */
     async function init() {
-      HS.loading(true, 'Loading melas…');
+      // Show cached data instantly — no spinner if cache exists
+      const cached = HS.lsGet(MELAS_CACHE);
+      if (cached && cached.length >= 0) {
+        melas = cached;
+        renderList();
+        fetchFreshMelas(); // Refresh silently in background
+      } else {
+        // First ever load — show spinner
+        HS.loading(true, 'Loading melas…');
+        await fetchFreshMelas();
+        HS.loading(false);
+      }
+    }
+
+    async function fetchFreshMelas() {
       try {
         const res = await HS.api({ action: 'getMelas' });
-        melas = (res.data || []).map(m => ({
+        const fresh = (res.data || []).map(m => ({
           ...m,
           DateFrom: HS.normDate(m.DateFrom),
           DateTo:   HS.normDate(m.DateTo),
         }));
+        HS.lsSet(MELAS_CACHE, fresh);
+        melas = fresh;
         renderList();
       } catch(e) {
-        HS.toast('Could not load melas. Check connection.', 'error', true);
-        renderError();
-      } finally {
-        HS.loading(false);
+        if (!HS.lsGet(MELAS_CACHE)) {
+          HS.toast('Could not load melas. Check connection.', 'error', true);
+          renderError();
+        }
       }
     }
 
@@ -221,20 +238,11 @@
     }
 
     /* ── ENTER MELA ───────────────────────── */
-    async function enterMela(melaId) {
+    function enterMela(melaId) {
       const mela = melas.find(m => m.MelaId === melaId);
       if (!mela) return;
       HS.setCurrentMela(mela);
-      HS.loading(true, 'Opening mela…');
-      try {
-        const res = await HS.api({ action: 'getMelaMenu', melaId });
-        const hasActive = (res.data || []).some(i => i.Status === 'active');
-        HS.navigate(hasActive ? 'log.html' : 'menu.html?setup=1');
-      } catch(e) {
-        HS.navigate('log.html');
-      } finally {
-        HS.loading(false);
-      }
+      HS.navigate('log.html');
     }
 
     /* ── MODAL ────────────────────────────── */
@@ -277,6 +285,7 @@
         const res = await HS.api({ action: editId ? 'updateMela' : 'createMela', data: JSON.stringify(data) });
         if (res.success) {
           HS.toast(editId ? '✅ Mela updated!' : '✅ Mela created!', 'success', true);
+          HS.lsDel(MELAS_CACHE);
           await init();
         } else {
           HS.toast('Error: ' + (res.error || 'Unknown'), 'error', true);
@@ -296,7 +305,7 @@
         HS.loading(true, 'Archiving…');
         try {
           const res = await HS.api({ action: 'archiveMela', melaId, status: 'archived' });
-          if (res.success) { HS.toast('Mela archived.', '', true); await init(); }
+          if (res.success) { HS.toast('Mela archived.', '', true); HS.lsDel(MELAS_CACHE); await init(); }
           else HS.toast('Error: ' + (res.error || 'Unknown'), 'error', true);
         } catch(e) {
           HS.toast('Network error.', 'error', true);

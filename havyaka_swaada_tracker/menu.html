@@ -218,6 +218,8 @@
         ]);
         menuItems   = menuRes.data  || [];
         allLibItems = libRes.data   || [];
+        // Keep log.html cache in sync
+        HS.lsSet('hs_menu_' + mela.MelaId, menuItems);
         render();
         if (setupMode) openAddModal();
       } catch(e) {

@@ -51,17 +51,29 @@
       HS.renderSidebar('log');
       HS.renderHeader({ title: 'Log Sale', subtitle: mela.MelaName, showMenu: true });
 
+      const CACHE_KEY = 'hs_menu_' + mela.MelaId;
+      const cached    = HS.lsGet(CACHE_KEY);
+
+      if (cached && cached.length > 0) {
+        // Show cached menu instantly — no loading spinner
+        menuItems = cached.filter(i => i.Status === 'active');
+        if (menuItems.length > 0) {
+          menuItems.forEach(it => { qty[it.ItemKey] = 0; });
+          renderPage();
+          // Silently refresh in background
+          refreshMenuBg(CACHE_KEY);
+          return;
+        }
+      }
+
+      // No usable cache — fetch with spinner
       HS.loading(true, 'Loading menu…');
       try {
         const res  = await HS.api({ action: 'getMelaMenu', melaId: mela.MelaId });
-        menuItems  = (res.data || []).filter(i => i.Status === 'active');
-
-        if (!menuItems.length) {
-          // No menu set up — redirect to setup
-          HS.navigate('menu.html?setup=1');
-          return;
-        }
-
+        const all  = res.data || [];
+        HS.lsSet(CACHE_KEY, all);
+        menuItems  = all.filter(i => i.Status === 'active');
+        if (!menuItems.length) { HS.navigate('menu.html?setup=1'); return; }
         menuItems.forEach(it => { qty[it.ItemKey] = 0; });
         renderPage();
       } catch(e) {
@@ -70,6 +82,24 @@
         HS.loading(false);
       }
     });
+
+    /* Silent background refresh — updates items if changed */
+    async function refreshMenuBg(cacheKey) {
+      try {
+        const res  = await HS.api({ action: 'getMelaMenu', melaId: mela.MelaId });
+        const all  = res.data || [];
+        HS.lsSet(cacheKey, all);
+        const fresh = all.filter(i => i.Status === 'active');
+        // Re-render only if items actually changed
+        const oldKeys   = menuItems.map(i => i.ItemKey).join(',');
+        const freshKeys = fresh.map(i => i.ItemKey).join(',');
+        if (oldKeys !== freshKeys) {
+          menuItems = fresh;
+          fresh.forEach(it => { if (qty[it.ItemKey] === undefined) qty[it.ItemKey] = 0; });
+          renderPage();
+        }
+      } catch(e) { /* silent — user already sees cached content */ }
+    }
 
     /* ── RENDER PAGE ── */
     function renderPage() {
