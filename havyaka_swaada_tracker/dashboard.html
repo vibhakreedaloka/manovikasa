@@ -41,6 +41,8 @@
         <div class="hs-stat-box">       <div class="hs-stat-num" id="sOrders">0</div>  <div class="hs-stat-lbl">Orders</div></div>
         <div class="hs-stat-box">       <div class="hs-stat-num" id="sCash">₹0</div>   <div class="hs-stat-lbl">Cash</div></div>
         <div class="hs-stat-box s-gold"><div class="hs-stat-num" id="sOnline">₹0</div> <div class="hs-stat-lbl">Online</div></div>
+        <div class="hs-stat-box s-red"> <div class="hs-stat-num" id="sPending">₹0</div><div class="hs-stat-lbl">Org. Pending</div></div>
+        <div class="hs-stat-box">       <div class="hs-stat-num" id="sFree">₹0</div>   <div class="hs-stat-lbl">Free Given</div></div>
       </div>
       <div class="inf-note" id="infNote" style="display:none;"></div>
       <div class="hs-card"><div class="hs-card-title">📦 Items Sold — Count</div>   <div class="chart-wrap tall"><canvas id="chartCount"></canvas></div></div>
@@ -109,8 +111,9 @@
           row._items = {};
           Object.entries(parsed).forEach(([key, val]) => {
             if (val && typeof val === 'object') {
-              // New format: { qty, price }
-              row._items[key] = { qty: Number(val.qty || 0), price: Number(val.price || 0) };
+              // New format: { qty, price } — preserve null price so fallback works
+              const p = (val.price !== null && val.price !== undefined) ? Number(val.price) : null;
+              row._items[key] = { qty: Number(val.qty || 0), price: p };
             } else {
               // Old JSON format: plain qty number (no price stored)
               row._items[key] = { qty: Number(val || 0), price: null };
@@ -150,7 +153,7 @@
         ]);
         melaMenu = menuRes.data || [];
         itemMap  = {};
-        melaMenu.forEach(it => { itemMap[it.ItemKey] = { name: it.ItemName, price: Number(it.SellingPrice)||0 }; });
+        melaMenu.forEach(it => { itemMap[it.ItemKey] = { name: it.ItemName, price: Number(it.SellingPrice)||0, category: it.Category||'Uncategorised' }; });
 
         // Also add old default items to itemMap for backward compat
         Object.entries(OLD_COL_TO_KEY).forEach(([col, key]) => {
@@ -183,21 +186,29 @@
     function filteredRows() { return selDay==='all' ? melaRows : melaRows.filter(r => r.Date===selDay); }
 
     function renderMelaDash() {
-      const rows    = filteredRows();
-      const paying  = rows.filter(r => r.CustomerType !== 'influencer');
-      const infRows = rows.filter(r => r.CustomerType === 'influencer');
-      const totalRev  = rows.reduce((s,r)   => s+Number(r.TotalAmount||0), 0);
-      const cashRev   = paying.filter(r=>r.PaymentMode==='cash')  .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const onlineRev = paying.filter(r=>r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const infRev    = infRows.reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const rows      = filteredRows();
+      const paying    = rows.filter(r => r.CustomerType !== 'influencer');
+      const infRows   = rows.filter(r => r.CustomerType === 'influencer');
 
-      document.getElementById('sTotal').textContent  = '₹'+HS.fmt(totalRev);
+      // Revenue = Cash + Online only
+      const revenue   = rows.filter(r => r.PaymentMode==='cash'||r.PaymentMode==='online')
+                            .reduce((s,r) => s+Number(r.TotalAmount||0), 0);
+      const cashRev   = rows.filter(r => r.PaymentMode==='cash')  .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const onlineRev = rows.filter(r => r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const orgPending= rows.filter(r => r.PaymentMode==='organiser').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const freeVal   = rows.filter(r => r.PaymentMode==='free')  .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const infRev    = infRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online')
+                               .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+
+      document.getElementById('sTotal').textContent  = '₹'+HS.fmt(revenue);
       document.getElementById('sOrders').textContent = rows.length;
       document.getElementById('sCash').textContent   = '₹'+HS.fmt(cashRev);
       document.getElementById('sOnline').textContent = '₹'+HS.fmt(onlineRev);
+      document.getElementById('sPending').textContent= '₹'+HS.fmt(orgPending);
+      document.getElementById('sFree').textContent   = '₹'+HS.fmt(freeVal);
 
       const infNote = document.getElementById('infNote');
-      if (infRev>0) { infNote.style.display='block'; infNote.textContent=`⭐ Influencer refund: ₹${HS.fmt(infRev)} (${infRows.length} visits)`; }
+      if (infRev>0) { infNote.style.display='block'; infNote.textContent=`⭐ Influencer refund: ₹${HS.fmt(infRev)} (${infRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online').length} orders)`; }
       else infNote.style.display='none';
 
       // Aggregate dynamically — use stored price if available, fall back to current price
@@ -220,22 +231,24 @@
       drawHBar('chartCount',   labels, allKeys.map(k=>counts[k]||0),   colors);
       drawHBar('chartRevenue', labels, allKeys.map(k=>revenues[k]||0), colors, true);
 
-      // Category (group by category if known, else by item)
+      // Category — group revenue by actual Category field
       const cats = {};
-      melaMenu.forEach(it => {
-        const rev = revenues[it.ItemKey] || 0;
-        // Use first word as rough category grouping
-        cats[it.ItemName] = (cats[it.ItemName]||0) + rev;
+      Object.keys(revenues).forEach(key => {
+        const cat = itemMap[key]?.category || 'Uncategorised';
+        cats[cat] = (cats[cat]||0) + (revenues[key]||0);
       });
-      const catLabels = Object.keys(cats);
-      drawHBar('chartCategory', catLabels, Object.values(cats),
+      const catLabels = Object.keys(cats).filter(c => cats[c] > 0);
+      drawHBar('chartCategory', catLabels, catLabels.map(c=>cats[c]),
                catLabels.map((_,i)=>MELA_PALETTE[i%MELA_PALETTE.length]), true);
 
+      // Payment breakdown — all 4 modes
       drawHBar('chartPayment',
-        ['Cash','Online','Influencer'],
-        [paying.filter(r=>r.PaymentMode==='cash').length,
-         paying.filter(r=>r.PaymentMode==='online').length, infRows.length],
-        ['#3D6338','#C4841A','#B83225']);
+        ['Cash','Online','Organiser (Pending)','Free'],
+        [ rows.filter(r=>r.PaymentMode==='cash').length,
+          rows.filter(r=>r.PaymentMode==='online').length,
+          rows.filter(r=>r.PaymentMode==='organiser').length,
+          rows.filter(r=>r.PaymentMode==='free').length ],
+        ['#3D6338','#C4841A','#B83225','#A09070']);
     }
 
     /* ═══ TAB 2 & 3 — ALL MELAS ═══ */
@@ -254,8 +267,8 @@
 
         // Build global item map
         const gItemMap = {};
-        globalItems.forEach(it => { gItemMap[it.ItemKey] = { name: it.ItemName, price: Number(it.DefaultPrice)||0 }; });
-        Object.entries(OLD_COL_TO_KEY).forEach(([col,key]) => { if (!gItemMap[key]) gItemMap[key]={name:col,price:0}; });
+        globalItems.forEach(it => { gItemMap[it.ItemKey] = { name: it.ItemName, price: Number(it.DefaultPrice)||0, category: it.Category||'Uncategorised' }; });
+        Object.entries(OLD_COL_TO_KEY).forEach(([col,key]) => { if (!gItemMap[key]) gItemMap[key]={name:col,price:0,category:'Uncategorised'}; });
 
         // Fetch purchases for all melas
         const purchases = {};
@@ -306,10 +319,12 @@
       const allRows   = Object.values(purchases).flat();
       const paying    = allRows.filter(r=>r.CustomerType!=='influencer');
       const infRows   = allRows.filter(r=>r.CustomerType==='influencer');
-      const totalRev  = allRows.reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const cashRev   = paying.filter(r=>r.PaymentMode==='cash')  .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const onlineRev = paying.filter(r=>r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const infRev    = infRows.reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const revenue   = allRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const cashRev   = allRows.filter(r=>r.PaymentMode==='cash')      .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const onlineRev = allRows.filter(r=>r.PaymentMode==='online')    .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const orgPending= allRows.filter(r=>r.PaymentMode==='organiser') .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const freeVal   = allRows.filter(r=>r.PaymentMode==='free')      .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const infRev    = allRows.filter(r=>r.CustomerType==='influencer'&&(r.PaymentMode==='cash'||r.PaymentMode==='online')).reduce((s,r)=>s+Number(r.TotalAmount||0),0);
 
       // Aggregate all items — use stored price if available
       const counts={}, revenues={};
@@ -330,22 +345,24 @@
 
       document.getElementById('allContent').innerHTML = `
         <div class="hs-stat-grid">
-          <div class="hs-stat-box s-green"><div class="hs-stat-num">₹${HS.fmt(totalRev)}</div>  <div class="hs-stat-lbl">Total Revenue</div></div>
-          <div class="hs-stat-box">        <div class="hs-stat-num">${allRows.length}</div>       <div class="hs-stat-lbl">Total Orders</div></div>
+          <div class="hs-stat-box s-green"><div class="hs-stat-num">₹${HS.fmt(revenue)}</div>    <div class="hs-stat-lbl">Total Revenue</div></div>
+          <div class="hs-stat-box">        <div class="hs-stat-num">${allRows.length}</div>        <div class="hs-stat-lbl">Total Orders</div></div>
           <div class="hs-stat-box">        <div class="hs-stat-num">₹${HS.fmt(cashRev)}</div>    <div class="hs-stat-lbl">Cash</div></div>
           <div class="hs-stat-box s-gold"> <div class="hs-stat-num">₹${HS.fmt(onlineRev)}</div>  <div class="hs-stat-lbl">Online</div></div>
+          <div class="hs-stat-box s-red">  <div class="hs-stat-num">₹${HS.fmt(orgPending)}</div> <div class="hs-stat-lbl">Org. Pending</div></div>
           <div class="hs-stat-box">        <div class="hs-stat-num">${active}</div>               <div class="hs-stat-lbl">Active Melas</div></div>
-          <div class="hs-stat-box">        <div class="hs-stat-num">${archived}</div>             <div class="hs-stat-lbl">Archived</div></div>
         </div>
-        ${infRev>0?`<div class="inf-note hs-mb">⭐ Total influencer refunds: ₹${HS.fmt(infRev)} (${infRows.length} visits)</div>`:''}
+        ${infRev>0?`<div class="inf-note hs-mb">⭐ Total influencer refunds: ₹${HS.fmt(infRev)}</div>`:''}
+        ${freeVal>0?`<div class="inf-note hs-mb" style="color:var(--text-muted)">🎁 Total free given: ₹${HS.fmt(freeVal)}</div>`:''}
         <div class="hs-card"><div class="hs-card-title">📦 Items Sold — All Melas</div>    <div class="chart-wrap tall"><canvas id="allCount"></canvas></div></div>
         <div class="hs-card"><div class="hs-card-title">💰 Revenue by Item — All Melas</div><div class="chart-wrap tall"><canvas id="allRevenue"></canvas></div></div>
-        <div class="hs-card"><div class="hs-card-title">💳 Cash vs Online — All Melas</div><div class="chart-wrap short"><canvas id="allPayment"></canvas></div></div>`;
+        <div class="hs-card"><div class="hs-card-title">💳 Payment Breakdown — All Melas</div><div class="chart-wrap short"><canvas id="allPayment"></canvas></div></div>`;
       drawHBar('allCount',  labels,allKeys.map(k=>counts[k]),   colors);
       drawHBar('allRevenue',labels,allKeys.map(k=>revenues[k]), colors,true);
-      drawHBar('allPayment',['Cash','Online','Influencer'],
-        [paying.filter(r=>r.PaymentMode==='cash').length, paying.filter(r=>r.PaymentMode==='online').length, infRows.length],
-        ['#3D6338','#C4841A','#B83225']);
+      drawHBar('allPayment',['Cash','Online','Organiser (Pending)','Free'],
+        [allRows.filter(r=>r.PaymentMode==='cash').length, allRows.filter(r=>r.PaymentMode==='online').length,
+         allRows.filter(r=>r.PaymentMode==='organiser').length, allRows.filter(r=>r.PaymentMode==='free').length],
+        ['#3D6338','#C4841A','#B83225','#A09070']);
     }
 
     /* ── HORIZONTAL BAR CHART ── */

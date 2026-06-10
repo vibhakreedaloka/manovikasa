@@ -112,12 +112,13 @@ const HS = (() => {
      SIDEBAR
   ══════════════════════════════════════ */
   const SIDEBAR_NAV = [
-    { id: 'log',       icon: '📝', label: 'Log Sale',    href: 'log.html' },
-    { id: 'dashboard', icon: '📊', label: 'Dashboard',   href: 'dashboard.html' },
-    { id: 'menu',      icon: '🍽️', label: 'Menu',        href: 'menu.html' },
-    { id: 'expenses',  icon: '💸', label: 'Expenses',    href: 'expenses.html' },
-    { id: 'inventory', icon: '📦', label: 'Inventory',   href: 'inventory.html' },
-    { id: 'info',      icon: 'ℹ️',  label: 'Mela Info',  href: 'mela-info.html' },
+    { id: 'log',          icon: '📝', label: 'Log Sale',     href: 'log.html' },
+    { id: 'dashboard',    icon: '📊', label: 'Dashboard',    href: 'dashboard.html' },
+    { id: 'transactions', icon: '🧾', label: 'Transactions', href: 'transactions.html' },
+    { id: 'menu',         icon: '🍽️', label: 'Menu',         href: 'menu.html' },
+    { id: 'expenses',     icon: '💸', label: 'Expenses',     href: 'expenses.html' },
+    { id: 'inventory',    icon: '📦', label: 'Inventory',    href: 'inventory.html' },
+    { id: 'info',         icon: 'ℹ️',  label: 'Mela Info',   href: 'mela-info.html' },
   ];
 
   function renderSidebar(activeId = '') {
@@ -227,7 +228,7 @@ const HS = (() => {
     const query = Object.entries(params)
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    const resp = await fetch(`${url}?${query}`);
+    const resp = await fetch(`${url}?${query}`, { cache: 'no-store' });
     const json = await resp.json();
     if (json.error) throw new Error(json.error);
     return json;

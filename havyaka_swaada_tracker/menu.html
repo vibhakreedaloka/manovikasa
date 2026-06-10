@@ -148,6 +148,10 @@
           <label class="hs-label">Selling Price (₹) *</label>
           <input class="hs-input" type="number" id="newPrice" placeholder="e.g. 60" min="0" />
         </div>
+        <div class="hs-field">
+          <label class="hs-label">Category</label>
+          <div id="newCatWrap"></div>
+        </div>
         <div class="hs-mt">
           <button class="hs-btn hs-btn-gold hs-btn-full" onclick="createNewItem()">✨ Create & Add</button>
         </div>
@@ -171,6 +175,10 @@
         <input class="hs-input" type="text" id="editName" placeholder="Item name" />
       </div>
       <div class="hs-field">
+        <label class="hs-label">Category</label>
+        <div id="editCatWrap"></div>
+      </div>
+      <div class="hs-field">
         <label class="hs-label">Selling Price (₹)</label>
         <input class="hs-input" type="number" id="editPrice" placeholder="e.g. 249" min="0" />
       </div>
@@ -187,8 +195,9 @@
   <script src="assets/common.js"></script>
   <script>
     let mela         = null;
-    let menuItems    = [];   // This mela's menu items (active + archived)
-    let allLibItems  = [];   // Global MenuItems library
+    let menuItems    = [];
+    let allLibItems  = [];
+    let categories   = [];   // Global category list
     let setupMode    = false;
     let showArchived = false;
 
@@ -202,26 +211,31 @@
         HS.renderHeader({ title: 'Set Up Menu', subtitle: mela.MelaName, showBack: true });
       } else {
         HS.renderSidebar('menu');
-        HS.renderHeader({ title: 'Menu', subtitle: mela.MelaName, showMenu: true });
+        HS.renderHeader({
+          title: 'Menu', subtitle: mela.MelaName, showMenu: true,
+          rightIcon: '🔄', rightFn: 'loadAll(true)',
+        });
       }
 
       loadAll();
     });
 
-    /* ── LOAD ── */
-    async function loadAll() {
+    async function loadAll(forceRefresh = false) {
       HS.loading(true, 'Loading menu…');
       try {
-        const [menuRes, libRes] = await Promise.all([
-          HS.api({ action: 'getMelaMenu',  melaId: mela.MelaId }),
-          HS.api({ action: 'getMenuItems' }),
+        const extra = forceRefresh ? { noCache: '1' } : {};
+        const [menuRes, libRes, catRes] = await Promise.all([
+          HS.api({ action: 'getMelaMenu',   melaId: mela.MelaId, ...extra }),
+          HS.api({ action: 'getMenuItems',  ...extra }),
+          HS.api({ action: 'getCategories' }),
         ]);
-        menuItems   = menuRes.data  || [];
-        allLibItems = libRes.data   || [];
-        // Keep log.html cache in sync
+        menuItems   = menuRes.data || [];
+        allLibItems = libRes.data  || [];
+        categories  = catRes.data  || [];
         HS.lsSet('hs_menu_' + mela.MelaId, menuItems);
         render();
         if (setupMode) openAddModal();
+        if (forceRefresh) HS.toast('✅ Menu refreshed from sheet!', 'success');
       } catch(e) {
         HS.toast('Could not load menu.', 'error');
       } finally {
@@ -301,7 +315,10 @@
         <div class="item-card">
           <div class="item-card-info">
             <div class="item-card-name">${it.ItemName}</div>
-            <div class="item-card-price">₹${HS.fmt(it.SellingPrice)}</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:3px;flex-wrap:wrap;">
+              <div class="item-card-price">₹${HS.fmt(it.SellingPrice)}</div>
+              ${it.Category ? `<span class="hs-badge hs-badge-green" style="font-size:10px;">${it.Category}</span>` : ''}
+            </div>
           </div>
           <div class="item-card-actions">
             <button class="icon-btn" title="Move up"   onclick="moveItem('${it.ItemKey}',-1)"
@@ -316,6 +333,59 @@
 
     function toggleArchived() { showArchived = !showArchived; render(); }
 
+    /* ── CATEGORY HELPERS ── */
+    function catSelectHTML(wrapperId, selected = '') {
+      const opts = categories.map(c =>
+        `<option value="${c}" ${c===selected?'selected':''}>${c}</option>`
+      ).join('');
+      return `
+        <select class="hs-input" id="${wrapperId}_sel" onchange="onCatChange('${wrapperId}')">
+          <option value="">-- Select category --</option>
+          ${opts}
+          <option value="__new__">＋ Add new category</option>
+        </select>
+        <div id="${wrapperId}_new" style="display:none;margin-top:8px;">
+          <div class="hs-row">
+            <input class="hs-input" type="text" id="${wrapperId}_inp"
+                   placeholder="New category name…" style="flex:1;" />
+            <button class="hs-btn hs-btn-primary hs-btn-sm"
+                    onclick="confirmNewCat('${wrapperId}')">Add</button>
+          </div>
+        </div>`;
+    }
+
+    function onCatChange(wrapperId) {
+      const sel = document.getElementById(wrapperId + '_sel');
+      const nf  = document.getElementById(wrapperId + '_new');
+      if (sel.value === '__new__') {
+        nf.style.display = 'block';
+        document.getElementById(wrapperId + '_inp').focus();
+      } else {
+        nf.style.display = 'none';
+      }
+    }
+
+    async function confirmNewCat(wrapperId) {
+      const inp  = document.getElementById(wrapperId + '_inp');
+      const name = inp.value.trim();
+      if (!name) { HS.toast('Enter a category name.', 'error'); return; }
+      try {
+        const res = await HS.api({ action: 'addCategory', name });
+        if (res.success) {
+          categories.push(name);
+          // Re-render the select and select new category
+          const wrap = document.getElementById(wrapperId);
+          wrap.innerHTML = catSelectHTML(wrapperId, name);
+          HS.toast('✅ Category added!', 'success');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+    }
+
+    function getCatValue(wrapperId) {
+      const sel = document.getElementById(wrapperId + '_sel');
+      return sel && sel.value !== '__new__' ? sel.value : '';
+    }
+
     /* ── ADD MODAL ── */
     let modalTab = 'lib';
 
@@ -324,6 +394,8 @@
       document.getElementById('newName').value  = '';
       document.getElementById('newPrice').value = '';
       document.getElementById('libSearch').value = '';
+      // Render category dropdown for create form
+      document.getElementById('newCatWrap').innerHTML = catSelectHTML('newCatWrap', '');
       switchModalTab('lib');
       HS.openModal('addModal');
     }
@@ -427,17 +499,20 @@
 
     /* Create new item */
     async function createNewItem() {
-      const name  = document.getElementById('newName').value.trim();
-      const price = Number(document.getElementById('newPrice').value);
-      if (!name)     { HS.toast('Item name is required.', 'error'); return; }
-      if (!price)    { HS.toast('Selling price is required.', 'error'); return; }
+      const name     = document.getElementById('newName').value.trim();
+      const priceVal = document.getElementById('newPrice').value.trim();
+      const category = getCatValue('newCatWrap');
+      if (!name)           { HS.toast('Item name is required.', 'error'); return; }
+      if (priceVal === '') { HS.toast('Selling price is required.', 'error'); return; }
+      const price = Number(priceVal);
+      if (isNaN(price) || price < 0) { HS.toast('Enter a valid price (0 or more).', 'error'); return; }
 
       HS.closeModal('addModal');
       HS.loading(true, 'Creating item…');
       try {
         const res = await HS.api({
           action: 'createMenuItem',
-          data: JSON.stringify({ name, price, melaId: mela.MelaId }),
+          data: JSON.stringify({ name, price, category, melaId: mela.MelaId }),
         });
         if (res.success) { HS.toast('✅ Item created!', 'success'); await loadAll(); }
         else HS.toast('Error: ' + (res.error||'Unknown'), 'error');
@@ -452,20 +527,24 @@
       document.getElementById('editItemKey').value = itemKey;
       document.getElementById('editName').value    = it.ItemName;
       document.getElementById('editPrice').value   = it.SellingPrice;
+      document.getElementById('editCatWrap').innerHTML = catSelectHTML('editCatWrap', it.Category || '');
       HS.openModal('editModal');
     }
 
     async function saveEdit() {
-      const itemKey = document.getElementById('editItemKey').value;
-      const name    = document.getElementById('editName').value.trim();
-      const price   = Number(document.getElementById('editPrice').value);
-      if (!name)  { HS.toast('Item name is required.', 'error'); return; }
-      if (!price) { HS.toast('Price is required.', 'error'); return; }
+      const itemKey  = document.getElementById('editItemKey').value;
+      const name     = document.getElementById('editName').value.trim();
+      const priceVal = document.getElementById('editPrice').value.trim();
+      const category = getCatValue('editCatWrap');
+      if (!name)           { HS.toast('Item name is required.', 'error'); return; }
+      if (priceVal === '') { HS.toast('Price is required.', 'error'); return; }
+      const price = Number(priceVal);
+      if (isNaN(price) || price < 0) { HS.toast('Enter a valid price (0 or more).', 'error'); return; }
 
       HS.closeModal('editModal');
       HS.loading(true, 'Saving…');
       try {
-        const payload = { melaId: mela.MelaId, itemKey, sellingPrice: price, itemName: name };
+        const payload = { melaId: mela.MelaId, itemKey, sellingPrice: price, itemName: name, category };
         const res = await HS.api({ action: 'updateMelaMenuItem', data: JSON.stringify(payload) });
         if (res.success) { HS.toast('✅ Item updated!', 'success'); await loadAll(); }
         else HS.toast('Error: ' + (res.error||'Unknown'), 'error');

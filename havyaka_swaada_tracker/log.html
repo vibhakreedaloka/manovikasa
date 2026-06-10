@@ -20,6 +20,8 @@
       background: rgba(196,132,26,.12); border: 1px solid rgba(196,132,26,.3);
       border-radius: 8px; font-size: 12.5px; color: var(--gold); font-weight: 600;
     }
+    .pay-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pay-grid .hs-tog { flex: 1 1 calc(50% - 4px); min-width: 80px; }
     .save-wrap { position: sticky; bottom: 16px; }
   </style>
 </head>
@@ -36,8 +38,20 @@
 
   <script src="assets/common.js"></script>
   <script>
+    /* ── PAYMENT CONFIG ── */
+    const PAY_OPTIONS = {
+      normal:     ['online','cash','free'],
+      influencer: ['online','cash','free','organiser'],
+    };
+    const PAY_LABELS = {
+      online:    '📱 Online',
+      cash:      '💵 Cash',
+      free:      '🎁 Free',
+      organiser: '🏢 Organiser',
+    };
+
     /* ── STATE ── */
-    let menuItems = [];   // Active items for this mela
+    let menuItems = [];
     let qty       = {};
     let custType  = 'normal';
     let payMode   = 'online';
@@ -55,18 +69,15 @@
       const cached    = HS.lsGet(CACHE_KEY);
 
       if (cached && cached.length > 0) {
-        // Show cached menu instantly — no loading spinner
         menuItems = cached.filter(i => i.Status === 'active');
         if (menuItems.length > 0) {
           menuItems.forEach(it => { qty[it.ItemKey] = 0; });
           renderPage();
-          // Silently refresh in background
           refreshMenuBg(CACHE_KEY);
           return;
         }
       }
 
-      // No usable cache — fetch with spinner
       HS.loading(true, 'Loading menu…');
       try {
         const res  = await HS.api({ action: 'getMelaMenu', melaId: mela.MelaId });
@@ -83,14 +94,12 @@
       }
     });
 
-    /* Silent background refresh — updates items if changed */
     async function refreshMenuBg(cacheKey) {
       try {
-        const res  = await HS.api({ action: 'getMelaMenu', melaId: mela.MelaId });
-        const all  = res.data || [];
+        const res   = await HS.api({ action: 'getMelaMenu', melaId: mela.MelaId });
+        const all   = res.data || [];
         HS.lsSet(cacheKey, all);
         const fresh = all.filter(i => i.Status === 'active');
-        // Re-render only if items actually changed
         const oldKeys   = menuItems.map(i => i.ItemKey).join(',');
         const freshKeys = fresh.map(i => i.ItemKey).join(',');
         if (oldKeys !== freshKeys) {
@@ -98,13 +107,12 @@
           fresh.forEach(it => { if (qty[it.ItemKey] === undefined) qty[it.ItemKey] = 0; });
           renderPage();
         }
-      } catch(e) { /* silent — user already sees cached content */ }
+      } catch(e) {}
     }
 
     /* ── RENDER PAGE ── */
     function renderPage() {
       document.getElementById('mainPage').innerHTML = `
-        <!-- Date -->
         <div class="hs-card">
           <div class="hs-card-title">📅 Date</div>
           <div class="hs-row">
@@ -113,7 +121,6 @@
           </div>
         </div>
 
-        <!-- Customer Info -->
         <div class="hs-card">
           <div class="hs-card-title">👤 Customer Info</div>
           <div class="hs-field">
@@ -126,7 +133,6 @@
           </div>
         </div>
 
-        <!-- Customer Type -->
         <div class="hs-card">
           <div class="hs-card-title">🏷️ Customer Type</div>
           <div class="hs-toggle-pair">
@@ -138,11 +144,10 @@
               <label class="hs-label">Social Media Profile <span class="hs-opt">optional</span></label>
               <input class="hs-input" type="text" id="socialMedia" placeholder="@username or profile link" autocomplete="off" />
             </div>
-            <div class="inf-row">⚠️ Influencer — amount calculated but not charged directly.</div>
+            <div class="inf-row">⭐ Influencer — amount tracked, not directly charged.</div>
           </div>
         </div>
 
-        <!-- Items -->
         <div class="hs-card">
           <div class="hs-card-title">🛒 Items Ordered</div>
           ${menuItems.map(it => `
@@ -159,22 +164,45 @@
             </div>`).join('')}
         </div>
 
-        <!-- Payment -->
         <div class="hs-card">
           <div class="hs-card-title">💳 Payment Mode</div>
-          <div class="hs-toggle-pair">
-            <button class="hs-tog on-green" id="payOnline" onclick="setPay('online')">📱 Online</button>
-            <button class="hs-tog"          id="payCash"   onclick="setPay('cash')">💵 Cash</button>
-          </div>
+          <div class="pay-grid" id="paymentOptions"></div>
         </div>
 
-        <!-- Save -->
         <div class="save-wrap">
           <button class="hs-btn-cta inactive" id="saveBtn" onclick="savePurchase()">
             Nothing selected yet
           </button>
         </div>
       `;
+      renderPaymentOptions();
+    }
+
+    /* ── PAYMENT ── */
+    function renderPaymentOptions() {
+      const modes = PAY_OPTIONS[custType] || PAY_OPTIONS.normal;
+      const el = document.getElementById('paymentOptions');
+      if (!el) return;
+      el.innerHTML = modes.map(m =>
+        `<button class="hs-tog ${payMode===m?'on-green':''}" onclick="setPay('${m}')">${PAY_LABELS[m]}</button>`
+      ).join('');
+    }
+
+    function setPay(m) {
+      payMode = m;
+      renderPaymentOptions();
+      updateSaveBtn();
+    }
+
+    /* ── CUSTOMER TYPE ── */
+    function setCustType(t) {
+      custType = t;
+      if (!(PAY_OPTIONS[t] || []).includes(payMode)) payMode = 'online';
+      document.getElementById('togNormal').className     = 'hs-tog' + (t==='normal'     ? ' on-green' : '');
+      document.getElementById('togInfluencer').className = 'hs-tog' + (t==='influencer' ? ' on-gold'  : '');
+      document.getElementById('smField').style.display   = t==='influencer' ? 'block' : 'none';
+      renderPaymentOptions();
+      updateSaveBtn();
     }
 
     /* ── QTY ── */
@@ -190,41 +218,40 @@
     }
 
     function updateSaveBtn() {
-      const total = calcTotal();
-      const btn   = document.getElementById('saveBtn');
+      const total    = calcTotal();
+      const hasItems = menuItems.some(it => (qty[it.ItemKey] || 0) > 0);
+      const btn      = document.getElementById('saveBtn');
       if (!btn) return;
-      if (total === 0) {
-        btn.textContent = 'Nothing selected yet'; btn.className = 'hs-btn-cta inactive'; btn.style.background='';
+      btn.style.background = '';
+      if (!hasItems) {
+        btn.textContent = 'Nothing selected yet';
+        btn.className   = 'hs-btn-cta inactive';
+      } else if (payMode === 'free') {
+        btn.textContent = `🎁 Free — ₹${HS.fmt(total)} logged ✓`;
+        btn.className   = 'hs-btn-cta';
+        btn.style.background = 'var(--brown-mid)';
+      } else if (custType === 'influencer' && payMode === 'organiser') {
+        btn.textContent = `🏢 Organiser — ₹${HS.fmt(total)}. Log.`;
+        btn.className   = 'hs-btn-cta';
+        btn.style.background = 'var(--brown)';
       } else if (custType === 'influencer') {
         btn.textContent = `⭐ Influencer — ₹${HS.fmt(total)}. Log Purchase.`;
-        btn.className='hs-btn-cta'; btn.style.background='var(--gold)';
+        btn.className   = 'hs-btn-cta';
+        btn.style.background = 'var(--gold)';
       } else {
-        btn.textContent = `Amount ₹${HS.fmt(total)}. Purchased ✓`;
-        btn.className='hs-btn-cta'; btn.style.background='';
+        btn.textContent = total === 0
+          ? `🎁 Sample — logged ✓`
+          : `Amount ₹${HS.fmt(total)}. Purchased ✓`;
+        btn.className   = 'hs-btn-cta';
       }
-    }
-
-    /* ── CUSTOMER TYPE & PAYMENT ── */
-    function setCustType(t) {
-      custType = t;
-      document.getElementById('togNormal').className     = 'hs-tog'+(t==='normal'     ?' on-green':'');
-      document.getElementById('togInfluencer').className = 'hs-tog'+(t==='influencer' ?' on-gold' :'');
-      document.getElementById('smField').style.display   = t==='influencer'?'block':'none';
-      updateSaveBtn();
-    }
-
-    function setPay(m) {
-      payMode = m;
-      document.getElementById('payOnline').className = 'hs-tog'+(m==='online'?' on-green':'');
-      document.getElementById('payCash').className   = 'hs-tog'+(m==='cash'  ?' on-green':'');
     }
 
     /* ── SAVE ── */
     async function savePurchase() {
+      const hasItems = menuItems.some(it => (qty[it.ItemKey] || 0) > 0);
+      if (!hasItems) { HS.toast('Please select at least one item.', 'error'); return; }
       const total = calcTotal();
-      if (total === 0) { HS.toast('Please select at least one item.', 'error'); return; }
 
-      // Build items object: { itemKey: {qty, price} } — only non-zero
       const items = {};
       menuItems.forEach(it => {
         if (qty[it.ItemKey] > 0)
@@ -234,19 +261,19 @@
       const data = {
         timestamp:    new Date().toISOString(),
         date:         document.getElementById('purchaseDate').value,
-        customerName: document.getElementById('custName')?.value.trim()   || '',
-        phone:        document.getElementById('custPhone')?.value.trim()  || '',
+        customerName: document.getElementById('custName')?.value.trim()    || '',
+        phone:        document.getElementById('custPhone')?.value.trim()   || '',
         customerType: custType,
-        socialMedia:  document.getElementById('socialMedia')?.value.trim()|| '',
+        socialMedia:  document.getElementById('socialMedia')?.value.trim() || '',
         items,
-        totalAmount:  total,
+        totalAmount:  total,   // actual value stored even for Free
         paymentMode:  payMode,
       };
 
       HS.loading(true, 'Saving…');
       try {
         const res = await HS.api({ action:'save', melaId: mela.MelaId, data: JSON.stringify(data) });
-        if (res.success) { HS.toast('✅ Purchase saved!', 'success'); resetForm(); }
+        if (res.success) { HS.toast('✅ Saved!', 'success'); resetForm(); }
         else HS.toast('Error: '+(res.error||'Unknown'), 'error');
       } catch(e) { HS.toast('Network error. Try again.', 'error'); }
       finally { HS.loading(false); }
@@ -258,12 +285,10 @@
         const el = document.getElementById('q-'+it.ItemKey);
         if (el) { el.textContent='0'; el.className='hs-qty-num'; }
       });
-      const custName = document.getElementById('custName');
-      const custPhone = document.getElementById('custPhone');
-      const socialMedia = document.getElementById('socialMedia');
-      if (custName) custName.value = '';
-      if (custPhone) custPhone.value = '';
-      if (socialMedia) socialMedia.value = '';
+      ['custName','custPhone','socialMedia'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
       setCustType('normal');
       setPay('online');
       updateSaveBtn();

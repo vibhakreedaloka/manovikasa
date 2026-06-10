@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Transactions — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+    .filter-chip {
+      padding: 5px 13px; border-radius: 20px; border: 2px solid var(--border);
+      background: var(--cream); color: var(--brown-mid);
+      font-family: 'Nunito',sans-serif; font-size: 12.5px; font-weight: 600;
+      cursor: pointer; transition: all .18s;
+    }
+    .filter-chip.on { background: var(--brown); border-color: var(--brown); color: #fff; }
+
+    .pending-banner {
+      background: rgba(184,50,37,.08); border: 1px solid rgba(184,50,37,.25);
+      border-radius: var(--radius); padding: 13px 15px;
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .pending-banner .p-icon { font-size: 22px; flex-shrink: 0; }
+    .pending-banner .p-text { flex: 1; }
+    .pending-banner .p-title { font-family:'Playfair Display',serif; font-size:14px; color:var(--red); }
+    .pending-banner .p-sub   { font-size:12px; color:var(--brown-mid); margin-top:2px; }
+
+    .tx-card {
+      background: var(--cream-light); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 13px 14px;
+      margin-bottom: 10px; box-shadow: var(--shadow-sm);
+    }
+    .tx-card.organiser { border-left: 4px solid var(--red); }
+
+    .tx-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+    .tx-date { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+    .pay-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .pay-badge.cash      { background: rgba(61,99,56,.15);  color: var(--green); }
+    .pay-badge.online    { background: rgba(196,132,26,.15); color: var(--gold); }
+    .pay-badge.free      { background: rgba(0,0,0,.07);      color: var(--text-muted); }
+    .pay-badge.organiser { background: rgba(184,50,37,.12);  color: var(--red); }
+
+    .tx-customer { font-size: 13px; font-weight: 600; color: var(--brown-dark); margin-bottom: 4px; }
+    .tx-items    { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 6px; }
+
+    .tx-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tx-amount { font-family:'Playfair Display',serif; font-size:16px; color:var(--brown); }
+    .tx-amount.free { color: var(--text-muted); text-decoration: line-through; font-size:14px; }
+
+    .mark-paid-btn {
+      padding: 7px 14px; border-radius: 8px;
+      background: var(--green); color: #fff;
+      border: none; font-family:'Nunito',sans-serif;
+      font-size: 12.5px; font-weight: 700; cursor: pointer;
+      transition: filter .18s;
+    }
+    .mark-paid-btn:active { filter: brightness(.88); }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page" id="mainPage">
+    <div class="hs-empty">
+      <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+      <div class="hs-empty-sub">Loading transactions…</div>
+    </div>
+  </main>
+
+  <!-- Mark as Paid Modal -->
+  <div class="hs-modal-bg" id="paidModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title">Mark as Paid</div>
+      <p class="hs-text-muted hs-mb">How did the organiser pay?</p>
+      <input type="hidden" id="paidRowIndex" />
+      <div class="hs-toggle-pair">
+        <button class="hs-tog" id="paidCash"   onclick="setPaidMode('cash')">💵 Cash</button>
+        <button class="hs-tog" id="paidOnline" onclick="setPaidMode('online')">📱 Online</button>
+      </div>
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="confirmMarkPaid()">✓ Confirm</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('paidModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/common.js"></script>
+  <script>
+    const OLD_COL_TO_KEY = {
+      'NeerGojjuShot':'item_neerShot','NeerGojjuFull':'item_neerFull',
+      'HunaseHannina':'item_hunase','HalfHunaseHannina':'item_halfHunase',
+      'MandanGojju100':'item_mandan100','MandanGojju200':'item_mandan200',
+      'MandanGojju500':'item_mandan500','MangoGula100':'item_mangoGula100',
+      'MangoGula250':'item_mangoGula250',
+    };
+
+    let mela      = null;
+    let allTx     = [];
+    let itemMap   = {};
+    let selFilter = 'all';
+    let paidMode  = 'cash';
+
+    /* ── INIT ── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      mela = HS.getCurrentMela();
+      if (!mela) { HS.navigate('index.html'); return; }
+
+      HS.renderSidebar('transactions');
+      HS.renderHeader({ title: 'Transactions', subtitle: mela.MelaName, showMenu: true });
+
+      HS.loading(true, 'Loading…');
+      try {
+        const [menuRes, dataRes] = await Promise.all([
+          HS.api({ action: 'getMelaMenu', melaId: mela.MelaId }),
+          HS.api({ action: 'getData',     melaId: mela.MelaId }),
+        ]);
+
+        // Build item key → name map
+        itemMap = {};
+        (menuRes.data || []).forEach(it => { itemMap[it.ItemKey] = it.ItemName; });
+        Object.entries(OLD_COL_TO_KEY).forEach(([col,key]) => { if (!itemMap[key]) itemMap[key] = col; });
+
+        // Normalize and reverse (newest first)
+        allTx = (dataRes.data || []).map(normalizeRow).reverse();
+        render();
+      } catch(e) {
+        HS.toast('Could not load transactions.', 'error');
+      } finally {
+        HS.loading(false);
+      }
+    });
+
+    /* ── NORMALIZE ── */
+    function normalizeRow(row) {
+      if (row.Items !== undefined && row.Items !== '') {
+        try {
+          const parsed = JSON.parse(row.Items);
+          row._items = {};
+          Object.entries(parsed).forEach(([k,v]) => {
+            if (v && typeof v==='object') {
+              const p = (v.price !== null && v.price !== undefined) ? Number(v.price) : null;
+              row._items[k] = { qty: Number(v.qty||0), price: p };
+            } else {
+              row._items[k] = { qty: Number(v||0), price: null };
+            }
+          });
+        } catch { row._items = {}; }
+      } else {
+        row._items = {};
+        Object.entries(OLD_COL_TO_KEY).forEach(([col,key]) => {
+          const q = Number(row[col]||0);
+          if (q>0) row._items[key] = {qty:q, price:null};
+        });
+      }
+      return row;
+    }
+
+    /* ── RENDER ── */
+    function render() {
+      const filtered = selFilter === 'all' ? allTx : allTx.filter(t => t.PaymentMode === selFilter);
+      const orgPending = allTx.filter(t => t.PaymentMode === 'organiser');
+      const orgTotal   = orgPending.reduce((s,t) => s + Number(t.TotalAmount||0), 0);
+
+      let html = '';
+
+      // Pending banner
+      if (orgPending.length > 0) {
+        html += `
+          <div class="pending-banner">
+            <div class="p-icon">🏢</div>
+            <div class="p-text">
+              <div class="p-title">₹${HS.fmt(orgTotal)} Pending from Organiser</div>
+              <div class="p-sub">${orgPending.length} order${orgPending.length>1?'s':''} not yet settled</div>
+            </div>
+          </div>`;
+      }
+
+      // Filter bar
+      const filters = [
+        {id:'all',    label:'All'},
+        {id:'cash',   label:'💵 Cash'},
+        {id:'online', label:'📱 Online'},
+        {id:'free',   label:'🎁 Free'},
+        {id:'organiser',label:'🏢 Organiser'},
+      ];
+      html += `<div class="filter-bar">`;
+      filters.forEach(f => {
+        const count = f.id==='all' ? allTx.length : allTx.filter(t=>t.PaymentMode===f.id).length;
+        if (f.id!=='all' && count===0) return; // hide empty modes
+        html += `<div class="filter-chip ${selFilter===f.id?'on':''}" onclick="setFilter('${f.id}')">${f.label} (${count})</div>`;
+      });
+      html += `</div>`;
+
+      // Transactions
+      if (!filtered.length) {
+        html += `<div class="hs-empty"><div class="hs-empty-icon">🧾</div><div class="hs-empty-title">No transactions</div><div class="hs-empty-sub">No orders found for this filter.</div></div>`;
+      } else {
+        html += filtered.map(txCardHTML).join('');
+      }
+
+      document.getElementById('mainPage').innerHTML = html;
+    }
+
+    function setFilter(f) { selFilter = f; render(); }
+
+    function txCardHTML(tx) {
+      const pm      = (tx.PaymentMode || 'cash').toLowerCase();
+      const date    = HS.formatDate(tx.Date) || tx.Date || '—';
+      const name    = tx.CustomerName || 'Anonymous';
+      const phone   = tx.Phone ? ` · ${tx.Phone}` : '';
+      const isFree  = pm === 'free';
+
+      // Build items summary
+      const parts = [];
+      Object.entries(tx._items || {}).forEach(([key, val]) => {
+        const q = val.qty || 0;
+        if (q > 0) parts.push(`${itemMap[key]||key} ×${q}`);
+      });
+      const itemsSummary = parts.join(', ') || '—';
+
+      const badgeLabels = {cash:'💵 Cash',online:'📱 Online',free:'🎁 Free',organiser:'🏢 Organiser (Pending)'};
+      const infLabel = tx.CustomerType==='influencer' ? ' · ⭐ Influencer' : '';
+
+      return `
+        <div class="tx-card ${pm==='organiser'?'organiser':''}">
+          <div class="tx-top">
+            <span class="tx-date">${date}${infLabel}</span>
+            <span class="pay-badge ${pm}">${badgeLabels[pm]||pm}</span>
+          </div>
+          <div class="tx-customer">${name}${phone}</div>
+          <div class="tx-items">${itemsSummary}</div>
+          <div class="tx-footer">
+            <span class="tx-amount ${isFree?'free':''}">₹${HS.fmt(tx.TotalAmount)}</span>
+            ${pm==='organiser' ? `<button class="mark-paid-btn" onclick="openMarkPaid(${tx._rowIndex})">✓ Mark as Paid</button>` : ''}
+          </div>
+        </div>`;
+    }
+
+    /* ── MARK AS PAID ── */
+    function openMarkPaid(rowIndex) {
+      document.getElementById('paidRowIndex').value = rowIndex;
+      paidMode = 'cash';
+      document.getElementById('paidCash').className   = 'hs-tog on-green';
+      document.getElementById('paidOnline').className = 'hs-tog';
+      HS.openModal('paidModal');
+    }
+
+    function setPaidMode(m) {
+      paidMode = m;
+      document.getElementById('paidCash').className   = 'hs-tog' + (m==='cash'  ?'  on-green':'');
+      document.getElementById('paidOnline').className = 'hs-tog' + (m==='online'?' on-green':'');
+    }
+
+    async function confirmMarkPaid() {
+      const rowIndex = Number(document.getElementById('paidRowIndex').value);
+      HS.closeModal('paidModal');
+      HS.loading(true, 'Updating payment…');
+      try {
+        const res = await HS.api({
+          action: 'updatePaymentMode',
+          melaId: mela.MelaId,
+          rowIndex,
+          paymentMode: paidMode,
+        });
+        if (res.success) {
+          // Update local data
+          const tx = allTx.find(t => t._rowIndex === rowIndex);
+          if (tx) tx.PaymentMode = paidMode;
+          HS.toast(`✅ Marked as ${paidMode}!`, 'success');
+          render();
+        } else {
+          HS.toast('Error: ' + (res.error||'Unknown'), 'error');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+  </script>
+</body>
+</html>
