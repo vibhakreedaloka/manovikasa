@@ -22,16 +22,21 @@
 /* ═══════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════ */
-const MELAS_SHEET      = 'Melas';
-const MENU_ITEMS_SHEET = 'MenuItems';
-const MELA_MENU_SHEET  = 'MelaMenu';
-const CATEGORIES_SHEET = 'Categories';
+const MELAS_SHEET            = 'Melas';
+const MENU_ITEMS_SHEET       = 'MenuItems';
+const MELA_MENU_SHEET        = 'MelaMenu';
+const CATEGORIES_SHEET       = 'Categories';
+const EXPENSE_CATEGORIES_SHEET = 'ExpenseCategories';
 
-const MELAS_HEADERS      = ['MelaId','MelaName','Area','OrganiserName','ContactPerson','ContactPhone','DateFrom','DateTo','Status','CreatedAt'];
-const MENU_ITEMS_HEADERS = ['ItemKey','ItemName','DefaultPrice','CreatedInMela','CreatedAt','Category'];
-const MELA_MENU_HEADERS  = ['MelaId','ItemKey','SellingPrice','Status','SortOrder','AddedAt'];
-const PURCHASES_HEADERS_NEW = ['Timestamp','Date','CustomerName','Phone','CustomerType','SocialMedia','Items','TotalAmount','PaymentMode'];
-const CATEGORIES_HEADERS = ['CategoryName'];
+const MELAS_HEADERS           = ['MelaId','MelaName','Area','OrganiserName','ContactPerson','ContactPhone','DateFrom','DateTo','Status','CreatedAt'];
+const MENU_ITEMS_HEADERS      = ['ItemKey','ItemName','DefaultPrice','CreatedInMela','CreatedAt','Category'];
+const MELA_MENU_HEADERS       = ['MelaId','ItemKey','SellingPrice','Status','SortOrder','AddedAt'];
+const PURCHASES_HEADERS_NEW   = ['Timestamp','Date','CustomerName','Phone','CustomerType','SocialMedia','Items','TotalAmount','PaymentMode'];
+const CATEGORIES_HEADERS      = ['CategoryName'];
+const EXPENSE_CATEGORIES_HEADERS = ['CategoryName'];
+const EXPENSE_HEADERS         = ['ExpenseId','Date','Category','Amount','Notes','CreatedAt'];
+
+const DEFAULT_EXPENSE_CATEGORIES = ['Stall Rent','Ingredients','Labour','Transport','Packaging','Other'];
 
 const OLD_COL_TO_KEY = {
   'NeerGojjuShot':'item_neerShot','NeerGojjuFull':'item_neerFull',
@@ -164,6 +169,24 @@ function getMelaMenuSheet(ss) {
   return s;
 }
 
+function getExpenseCategoriesSheet(ss) {
+  let s = ss.getSheetByName(EXPENSE_CATEGORIES_SHEET);
+  if (!s) {
+    s = ss.insertSheet(EXPENSE_CATEGORIES_SHEET);
+    s.appendRow(EXPENSE_CATEGORIES_HEADERS); styleHeader(s,1);
+    DEFAULT_EXPENSE_CATEGORIES.forEach(c => s.appendRow([c]));
+  }
+  return s;
+}
+
+function getExpensesSheet(ss, melaId) {
+  const name = 'expenses_' + melaId;
+  let s = ss.getSheetByName(name);
+  if (!s) { s=ss.insertSheet(name); s.appendRow(EXPENSE_HEADERS); styleHeader(s,EXPENSE_HEADERS.length); }
+  return s;
+}
+
+
 function getPurchasesSheet(ss, melaId) {
   const name = 'mela_'+melaId;
   let s = ss.getSheetByName(name);
@@ -203,7 +226,13 @@ function doGet(e) {
       case 'createMela':          return handleCreateMela(ss,e);
       case 'updateMela':          return handleUpdateMela(ss,e);
       case 'archiveMela':         return handleArchiveMela(ss,e);
-      case 'getCategories':       return handleGetCategories(ss);
+      case 'getExpenseCategories': return handleGetExpenseCategories(ss);
+      case 'addExpenseCategory':   return handleAddExpenseCategory(ss,e);
+      case 'getExpenses':          return handleGetExpenses(ss,e);
+      case 'addExpense':           return handleAddExpense(ss,e);
+      case 'updateExpense':        return handleUpdateExpense(ss,e);
+      case 'deleteExpense':        return handleDeleteExpense(ss,e);
+      case 'getCategories':        return handleGetCategories(ss);
       case 'addCategory':         return handleAddCategory(ss,e);
       case 'getMenuItems':        return handleGetMenuItems(ss,e);
       case 'getMelaMenu':         return handleGetMelaMenu(ss,e);
@@ -416,7 +445,72 @@ function handleReorderMelaMenu(ss,e) {
   return ok({success:true});
 }
 
-/* ── Migrate an old-format purchases sheet to new JSON Items format ── */
+/* ═══════════════════════════════════════
+   EXPENSE HANDLERS
+═══════════════════════════════════════ */
+function handleGetExpenseCategories(ss) {
+  const data = sheetToObjects(getExpenseCategoriesSheet(ss));
+  return ok({ data: data.map(r=>r.CategoryName).filter(Boolean) });
+}
+
+function handleAddExpenseCategory(ss,e) {
+  const name=e.parameter.name;
+  if (!name) return ok({success:false,error:'Category name required'});
+  getExpenseCategoriesSheet(ss).appendRow([name]);
+  return ok({success:true});
+}
+
+function handleGetExpenses(ss,e) {
+  const melaId=e.parameter.melaId;
+  if (!melaId) return ok({data:[],error:'melaId required'});
+  const cKey='expenses_'+melaId;
+  if (e.parameter.noCache!=='1') { const hit=cGet(cKey); if(hit) return ok({data:hit}); }
+  const data=sheetToObjects(getExpensesSheet(ss,melaId));
+  cPut(cKey,data);
+  return ok({data});
+}
+
+function handleAddExpense(ss,e) {
+  const d=JSON.parse(e.parameter.data);
+  const expenseId='exp_'+Date.now(), now=new Date().toISOString();
+  getExpensesSheet(ss,d.melaId).appendRow([expenseId,d.date,d.category,d.amount,d.notes||'',now]);
+  cDel('expenses_'+d.melaId);
+  return ok({success:true,expenseId});
+}
+
+function handleUpdateExpense(ss,e) {
+  const d=JSON.parse(e.parameter.data);
+  const sheet=getExpensesSheet(ss,d.melaId);
+  const rows=sheet.getDataRange().getValues(), hdrs=rows[0];
+  const idCol=hdrs.indexOf('ExpenseId');
+  for (let i=1;i<rows.length;i++) {
+    if (rows[i][idCol]===d.expenseId) {
+      const set=(col,val)=>{ const c=hdrs.indexOf(col); if(c>=0) sheet.getRange(i+1,c+1).setValue(val); };
+      set('Date',d.date); set('Category',d.category);
+      set('Amount',d.amount); set('Notes',d.notes||'');
+      cDel('expenses_'+d.melaId);
+      return ok({success:true});
+    }
+  }
+  return ok({success:false,error:'Expense not found'});
+}
+
+function handleDeleteExpense(ss,e) {
+  const melaId=e.parameter.melaId, expenseId=e.parameter.expenseId;
+  const sheet=getExpensesSheet(ss,melaId);
+  const rows=sheet.getDataRange().getValues(), hdrs=rows[0];
+  const idCol=hdrs.indexOf('ExpenseId');
+  for (let i=1;i<rows.length;i++) {
+    if (rows[i][idCol]===expenseId) {
+      sheet.deleteRow(i+1);
+      cDel('expenses_'+melaId);
+      return ok({success:true});
+    }
+  }
+  return ok({success:false,error:'Expense not found'});
+}
+
+
 function migrateToNewFormat(sheet) {
   const data = sheet.getDataRange().getValues();
   if (data.length < 1) return;

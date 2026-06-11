@@ -25,6 +25,7 @@
     <button class="hs-tab active"  onclick="switchTab('mela',    this)">This Mela</button>
     <button class="hs-tab"         onclick="switchTab('compare', this)">Mela vs Mela</button>
     <button class="hs-tab"         onclick="switchTab('all',     this)">All Melas</button>
+    <button class="hs-tab"         onclick="switchTab('pl',      this)">P&amp;L</button>
   </div>
 
   <main class="hs-page">
@@ -63,6 +64,12 @@
       <div id="allContent"><div style="text-align:center;padding:32px;color:var(--text-muted);">Tap Refresh to load all-mela data.</div></div>
     </div>
 
+    <!-- TAB 4: P&L -->
+    <div class="tab-panel" id="panel-pl">
+      <button class="hs-btn hs-btn-secondary hs-btn-full hs-mb" style="margin-top:0;" onclick="loadPL(true)">🔄 Refresh</button>
+      <div id="plContent"><div style="text-align:center;padding:32px;color:var(--text-muted);">Tap Refresh to load P&amp;L data.</div></div>
+    </div>
+
   </main>
 
   <script src="assets/common.js"></script>
@@ -89,7 +96,8 @@
     let itemMap   = {};     // itemKey → {ItemName, SellingPrice}
     let selDay    = 'all';
     let allCache  = null;
-    let globalItems = [];   // from getMenuItems (all ever created)
+    let plCache   = null;
+    let globalItems = [];
     let myCharts  = {};
     let curTab    = 'mela';
     let mela      = null;
@@ -103,7 +111,7 @@
       loadMelaData();
     });
 
-    /* ── NORMALIZE ROW: handle old (column/plain-qty) and new ({qty,price}) formats ── */
+    /* ── NORMALIZE ROW ── */
     function normalizeRow(row) {
       if (row.Items !== undefined && row.Items !== '') {
         try {
@@ -111,17 +119,14 @@
           row._items = {};
           Object.entries(parsed).forEach(([key, val]) => {
             if (val && typeof val === 'object') {
-              // New format: { qty, price } — preserve null price so fallback works
               const p = (val.price !== null && val.price !== undefined) ? Number(val.price) : null;
               row._items[key] = { qty: Number(val.qty || 0), price: p };
             } else {
-              // Old JSON format: plain qty number (no price stored)
               row._items[key] = { qty: Number(val || 0), price: null };
             }
           });
         } catch { row._items = {}; }
       } else {
-        // Very old format — individual columns, no price stored
         row._items = {};
         Object.entries(OLD_COL_TO_KEY).forEach(([col, key]) => {
           const q = Number(row[col] || 0);
@@ -141,6 +146,8 @@
       if ((tab === 'compare' || tab === 'all') && !allCache) loadAllData(false);
       else if (tab === 'compare') renderCompare();
       else if (tab === 'all') renderAll();
+      else if (tab === 'pl' && !plCache) loadPL(false);
+      else if (tab === 'pl') renderPL();
     }
 
     /* ═══ TAB 1 — THIS MELA ═══ */
@@ -262,7 +269,7 @@
           HS.api({ action: 'getMelas' }),
           HS.api({ action: 'getMenuItems' }),
         ]);
-        const allMelas = (melasRes.data||[]).map(m=>({...m, DateFrom:HS.normDate(m.DateFrom), DateTo:HS.normDate(m.DateTo)}));
+        const allMelas = (melasRes.data||[]).map(m=>({...m, DateFrom:HS.normDate(m.DateFrom), DateTo:HS.normDate(m.DateTo)})).reverse();
         globalItems    = globalRes.data || [];
 
         // Build global item map
@@ -392,6 +399,121 @@
           }
         }
       });
+    }
+
+    /* ═══ TAB 4 — P&L ═══ */
+    async function loadPL(force) {
+      if (plCache && !force) { renderPL(); return; }
+      HS.loading(true, 'Loading P&L…');
+      try {
+        // Load all non-archived melas
+        const melasRes = await HS.api({ action: 'getMelas' });
+        const allMelas = (melasRes.data || []).filter(m => m.Status !== 'archived').reverse();
+
+        // For each mela, load purchases + expenses in parallel
+        const results = await Promise.all(allMelas.map(async m => {
+          const [dataRes, expRes] = await Promise.all([
+            HS.api({ action: 'getData',       melaId: m.MelaId }),
+            HS.api({ action: 'getExpenses',    melaId: m.MelaId }),
+          ]);
+          const rows     = (dataRes.data || []).map(normalizeRow);
+          const revenue  = rows.filter(r => r.PaymentMode==='cash'||r.PaymentMode==='online')
+                               .reduce((s,r) => s+Number(r.TotalAmount||0), 0);
+          const expenses = (expRes.data || []).reduce((s,e) => s+Number(e.Amount||0), 0);
+          return { mela: m, revenue, expenses, profit: revenue - expenses };
+        }));
+
+        plCache = results;
+        renderPL();
+      } catch(e) { HS.toast('Could not load P&L data.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    function renderPL() {
+      if (!plCache) return;
+      const data = plCache;
+
+      const totalRev  = data.reduce((s,d) => s+d.revenue,  0);
+      const totalExp  = data.reduce((s,d) => s+d.expenses, 0);
+      const totalProf = totalRev - totalExp;
+      const profClass = totalProf >= 0 ? 's-green' : 's-red';
+
+      // Find current mela entry
+      const cur = data.find(d => d.mela.MelaId === mela.MelaId);
+
+      let html = `
+        <div class="hs-stat-grid">
+          <div class="hs-stat-box s-green"><div class="hs-stat-num">₹${HS.fmt(totalRev)}</div>  <div class="hs-stat-lbl">Total Revenue</div></div>
+          <div class="hs-stat-box s-red">  <div class="hs-stat-num">₹${HS.fmt(totalExp)}</div>  <div class="hs-stat-lbl">Total Expenses</div></div>
+          <div class="hs-stat-box ${profClass} " style="grid-column:1/-1;">
+            <div class="hs-stat-num">${totalProf>=0?'':'−'}₹${HS.fmt(Math.abs(totalProf))}</div>
+            <div class="hs-stat-lbl">Net ${totalProf>=0?'Profit':'Loss'} — All Melas</div>
+          </div>
+        </div>`;
+
+      // Per-mela table
+      html += `<div class="hs-card"><div class="hs-card-title">📊 Mela-wise P&L</div>`;
+      data.forEach(d => {
+        const profit  = d.profit;
+        const isProfit = profit >= 0;
+        const pct = d.revenue > 0 ? Math.round(profit/d.revenue*100) : 0;
+        const isCur = d.mela.MelaId === mela.MelaId;
+        html += `
+          <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--brown);">
+                  ${d.mela.MelaName}${isCur?' <span style="font-size:10px;color:var(--gold);">● current</span>':''}
+                </div>
+                <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">
+                  Rev ₹${HS.fmt(d.revenue)} &nbsp;·&nbsp; Exp ₹${HS.fmt(d.expenses)}
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;
+                            color:${isProfit?'var(--green)':'var(--red)'};">
+                  ${isProfit?'+':'−'}₹${HS.fmt(Math.abs(profit))}
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);">${isProfit?'Profit':'Loss'} ${pct!==0?'('+Math.abs(pct)+'%)':''}</div>
+              </div>
+            </div>
+          </div>`;
+      });
+      html += `</div>`;
+
+      // Revenue vs Expenses bar chart
+      if (data.length > 0) {
+        html += `<div class="hs-card"><div class="hs-card-title">💰 Revenue vs Expenses</div><div class="chart-wrap" style="height:${Math.max(120,data.length*55)}px;"><canvas id="plChart"></canvas></div></div>`;
+      }
+
+      document.getElementById('plContent').innerHTML = html;
+
+      // Draw grouped bar chart
+      if (data.length > 0) {
+        const ctx = document.getElementById('plChart')?.getContext('2d');
+        if (ctx) {
+          if (myCharts['plChart']) myCharts['plChart'].destroy();
+          myCharts['plChart'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: data.map(d => d.mela.MelaName.length>15 ? d.mela.MelaName.slice(0,15)+'…' : d.mela.MelaName),
+              datasets: [
+                { label:'Revenue',  data: data.map(d=>d.revenue),  backgroundColor:'#3D6338' },
+                { label:'Expenses', data: data.map(d=>d.expenses), backgroundColor:'#B83225' },
+              ]
+            },
+            options: {
+              indexAxis: 'y',
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend:{ position:'top', labels:{font:{family:'Nunito',size:12}} } },
+              scales: {
+                x: { beginAtZero:true, ticks:{callback:v=>'₹'+HS.fmt(v),font:{family:'Nunito',size:11}} },
+                y: { ticks:{font:{family:'Nunito',size:11}} },
+              }
+            }
+          });
+        }
+      }
     }
   </script>
 </body>

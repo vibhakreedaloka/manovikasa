@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Expenses — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .exp-summary {
+      background: linear-gradient(135deg, var(--brown) 0%, var(--brown-mid) 100%);
+      border-radius: var(--radius); padding: 16px;
+      margin-bottom: 14px; color: #fff;
+    }
+    .exp-summary-total { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; }
+    .exp-summary-label { font-size:12px; opacity:.75; margin-bottom:4px; }
+    .exp-summary-cats  { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .exp-summary-chip  {
+      background: rgba(255,255,255,.15); border-radius:20px;
+      padding:3px 10px; font-size:11.5px; font-weight:600;
+    }
+
+    .exp-card {
+      background:var(--cream-light); border:1px solid var(--border);
+      border-radius:var(--radius); padding:13px 14px;
+      margin-bottom:10px; box-shadow:var(--shadow-sm);
+    }
+    .exp-card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+    .exp-card-meta { flex:1; min-width:0; }
+    .exp-card-date  { font-size:12px; color:var(--text-muted); font-weight:600; margin-bottom:4px; }
+    .exp-card-notes { font-size:12.5px; color:var(--brown-mid); margin-top:4px; }
+    .exp-card-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
+    .exp-card-amount { font-family:'Playfair Display',serif; font-size:18px; color:var(--brown); font-weight:700; }
+    .exp-card-actions { display:flex; gap:6px; }
+    .exp-action-btn {
+      width:32px; height:32px; border-radius:8px; border:none;
+      font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      transition:filter .18s;
+    }
+    .exp-action-btn:active { filter:brightness(.85); }
+    .exp-edit-btn   { background:rgba(61,99,56,.12); }
+    .exp-delete-btn { background:rgba(184,50,37,.12); }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page" id="mainPage">
+    <div class="hs-empty">
+      <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+      <div class="hs-empty-sub">Loading expenses…</div>
+    </div>
+  </main>
+
+  <button class="hs-fab" onclick="openModal()" id="fab" aria-label="Add expense">+</button>
+
+  <!-- ── Add / Edit Modal ── -->
+  <div class="hs-modal-bg" id="expModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="modalTitle">Add Expense</div>
+      <input type="hidden" id="expId" />
+
+      <div class="hs-field">
+        <label class="hs-label">Date *</label>
+        <input class="hs-input" type="date" id="expDate" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Category *</label>
+        <div id="expCatWrap"></div>
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Amount (₹) *</label>
+        <input class="hs-input" type="number" id="expAmount" min="0" placeholder="e.g. 2000" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Notes <span class="hs-opt">optional</span></label>
+        <input class="hs-input" type="text" id="expNotes" placeholder="Brief description…" autocomplete="off" />
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveExpense()">💾 Save Expense</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('expModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/common.js"></script>
+  <script>
+    let mela       = null;
+    let expenses   = [];
+    let expCats    = [];
+
+    /* ── INIT ── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      mela = HS.getCurrentMela();
+      if (!mela) { HS.navigate('index.html'); return; }
+      HS.renderSidebar('expenses');
+      HS.renderHeader({ title: 'Expenses', subtitle: mela.MelaName, showMenu: true });
+      await loadAll();
+    });
+
+    async function loadAll() {
+      HS.loading(true, 'Loading expenses…');
+      try {
+        const [expRes, catRes] = await Promise.all([
+          HS.api({ action: 'getExpenses',          melaId: mela.MelaId }),
+          HS.api({ action: 'getExpenseCategories' }),
+        ]);
+        expenses = expRes.data || [];
+        expCats  = catRes.data || [];
+        render();
+      } catch(e) { HS.toast('Could not load expenses.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    /* ── RENDER ── */
+    function render() {
+      const sorted = [...expenses].sort((a,b) => (b.Date||'').localeCompare(a.Date||''));
+      const total  = expenses.reduce((s,e) => s + Number(e.Amount||0), 0);
+
+      // Category totals
+      const catTotals = {};
+      expenses.forEach(e => {
+        const c = e.Category || 'Other';
+        catTotals[c] = (catTotals[c]||0) + Number(e.Amount||0);
+      });
+
+      let html = '';
+
+      if (total > 0) {
+        const chips = Object.entries(catTotals)
+          .sort((a,b)=>b[1]-a[1])
+          .map(([c,v]) => `<span class="exp-summary-chip">${c}: ₹${HS.fmt(v)}</span>`)
+          .join('');
+        html += `
+          <div class="exp-summary">
+            <div class="exp-summary-label">Total Expenses</div>
+            <div class="exp-summary-total">₹${HS.fmt(total)}</div>
+            <div class="exp-summary-cats">${chips}</div>
+          </div>`;
+      }
+
+      if (!sorted.length) {
+        html += `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">💸</div>
+            <div class="hs-empty-title">No expenses yet</div>
+            <div class="hs-empty-sub">Tap + to log your first expense.</div>
+          </div>`;
+      } else {
+        html += sorted.map(expCardHTML).join('');
+      }
+
+      document.getElementById('mainPage').innerHTML = html;
+    }
+
+    function expCardHTML(exp) {
+      const date   = HS.formatDate(exp.Date) || exp.Date || '—';
+      const amount = '₹' + HS.fmt(Number(exp.Amount||0));
+      const cat    = exp.Category || 'Other';
+      return `
+        <div class="exp-card">
+          <div class="exp-card-top">
+            <div class="exp-card-meta">
+              <div class="exp-card-date">${date}</div>
+              <span class="hs-badge hs-badge-green">${cat}</span>
+              ${exp.Notes ? `<div class="exp-card-notes">${exp.Notes}</div>` : ''}
+            </div>
+            <div class="exp-card-right">
+              <div class="exp-card-amount">${amount}</div>
+              <div class="exp-card-actions">
+                <button class="exp-action-btn exp-edit-btn"   onclick="openEditModal('${exp.ExpenseId}')" title="Edit">✏️</button>
+                <button class="exp-action-btn exp-delete-btn" onclick="deleteExpense('${exp.ExpenseId}')" title="Delete">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    /* ── CATEGORY HELPERS ── */
+    function catSelectHTML(wrapperId, selected) {
+      const opts = expCats.map(c =>
+        `<option value="${c}" ${c===selected?'selected':''}>${c}</option>`
+      ).join('');
+      return `
+        <select class="hs-input" id="${wrapperId}_sel" onchange="onCatChange('${wrapperId}')">
+          <option value="">-- Select category --</option>
+          ${opts}
+          <option value="__new__">＋ Add new category</option>
+        </select>
+        <div id="${wrapperId}_new" style="display:none;margin-top:8px;">
+          <div class="hs-row">
+            <input class="hs-input" type="text" id="${wrapperId}_inp"
+                   placeholder="New category name…" style="flex:1;" />
+            <button class="hs-btn hs-btn-primary hs-btn-sm" onclick="confirmNewCat('${wrapperId}')">Add</button>
+          </div>
+        </div>`;
+    }
+
+    function onCatChange(w) {
+      const nf = document.getElementById(w+'_new');
+      if (document.getElementById(w+'_sel').value === '__new__') {
+        nf.style.display='block';
+        document.getElementById(w+'_inp').focus();
+      } else { nf.style.display='none'; }
+    }
+
+    async function confirmNewCat(w) {
+      const name = document.getElementById(w+'_inp').value.trim();
+      if (!name) { HS.toast('Enter a category name.','error'); return; }
+      try {
+        const res = await HS.api({ action:'addExpenseCategory', name });
+        if (res.success) {
+          expCats.push(name);
+          document.getElementById(w).innerHTML = catSelectHTML(w, name);
+          HS.toast('✅ Category added!','success');
+        }
+      } catch(e) { HS.toast('Network error.','error'); }
+    }
+
+    function getCatVal(w) {
+      const sel = document.getElementById(w+'_sel');
+      return sel && sel.value !== '__new__' ? sel.value : '';
+    }
+
+    /* ── ADD MODAL ── */
+    function openModal() {
+      document.getElementById('modalTitle').textContent = 'Add Expense';
+      document.getElementById('expId').value     = '';
+      document.getElementById('expDate').value   = HS.today();
+      document.getElementById('expAmount').value = '';
+      document.getElementById('expNotes').value  = '';
+      document.getElementById('expCatWrap').innerHTML = catSelectHTML('expCatWrap','');
+      HS.openModal('expModal');
+    }
+
+    function openEditModal(expenseId) {
+      const exp = expenses.find(e => e.ExpenseId === expenseId);
+      if (!exp) return;
+      document.getElementById('modalTitle').textContent = 'Edit Expense';
+      document.getElementById('expId').value     = expenseId;
+      document.getElementById('expDate').value   = exp.Date   || HS.today();
+      document.getElementById('expAmount').value = exp.Amount || '';
+      document.getElementById('expNotes').value  = exp.Notes  || '';
+      document.getElementById('expCatWrap').innerHTML = catSelectHTML('expCatWrap', exp.Category||'');
+      HS.openModal('expModal');
+    }
+
+    /* ── SAVE ── */
+    async function saveExpense() {
+      const expenseId = document.getElementById('expId').value;
+      const date      = document.getElementById('expDate').value;
+      const category  = getCatVal('expCatWrap');
+      const amtVal    = document.getElementById('expAmount').value.trim();
+      const notes     = document.getElementById('expNotes').value.trim();
+
+      if (!date)     { HS.toast('Date is required.','error');     return; }
+      if (!category) { HS.toast('Category is required.','error'); return; }
+      if (amtVal==='') { HS.toast('Amount is required.','error'); return; }
+      const amount = Number(amtVal);
+      if (isNaN(amount) || amount < 0) { HS.toast('Enter a valid amount.','error'); return; }
+
+      HS.closeModal('expModal');
+      HS.loading(true, expenseId ? 'Updating…' : 'Saving…');
+      try {
+        const isEdit = !!expenseId;
+        const action = isEdit ? 'updateExpense' : 'addExpense';
+        const data   = { melaId: mela.MelaId, expenseId, date, category, amount, notes };
+        const res    = await HS.api({ action, data: JSON.stringify(data) });
+        if (res.success) {
+          HS.toast(isEdit ? '✅ Expense updated!' : '✅ Expense added!', 'success');
+          await loadAll();
+        } else { HS.toast('Error: '+(res.error||'Unknown'),'error'); }
+      } catch(e) { HS.toast('Network error.','error'); }
+      finally { HS.loading(false); }
+    }
+
+    /* ── DELETE ── */
+    async function deleteExpense(expenseId) {
+      const exp = expenses.find(e => e.ExpenseId === expenseId);
+      HS.confirm(`Delete this expense (₹${HS.fmt(exp?.Amount||0)})?  This cannot be undone.`, async () => {
+        HS.loading(true,'Deleting…');
+        try {
+          const res = await HS.api({ action:'deleteExpense', melaId: mela.MelaId, expenseId });
+          if (res.success) { HS.toast('Expense deleted.','success'); await loadAll(); }
+          else HS.toast('Error: '+(res.error||'Unknown'),'error');
+        } catch(e) { HS.toast('Network error.','error'); }
+        finally { HS.loading(false); }
+      });
+    }
+  </script>
+</body>
+</html>

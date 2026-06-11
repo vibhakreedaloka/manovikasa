@@ -183,7 +183,7 @@
 
     /* ── RENDER ───────────────────────────── */
     function renderList() {
-      const active = melas.filter(m => m.Status !== 'archived');
+      const active = melas.filter(m => m.Status !== 'archived').reverse();
       const el = document.getElementById('melaList');
 
       if (!active.length) {
