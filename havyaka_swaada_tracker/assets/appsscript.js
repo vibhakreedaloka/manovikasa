@@ -232,6 +232,10 @@ function doGet(e) {
       case 'addExpense':           return handleAddExpense(ss,e);
       case 'updateExpense':        return handleUpdateExpense(ss,e);
       case 'deleteExpense':        return handleDeleteExpense(ss,e);
+      case 'getGlobalExpenses':    return handleGetExpenses(ss, {...e, parameter: {...e.parameter, melaId:'global'}});
+      case 'addGlobalExpense':     return handleAddExpense(ss,  {...e, parameter: {...e.parameter, data: patchMelaId(e.parameter.data,'global')}});
+      case 'updateGlobalExpense':  return handleUpdateExpense(ss,{...e, parameter: {...e.parameter, data: patchMelaId(e.parameter.data,'global')}});
+      case 'deleteGlobalExpense':  return handleDeleteExpense(ss,{...e, parameter: {...e.parameter, melaId:'global'}});
       case 'getCategories':        return handleGetCategories(ss);
       case 'addCategory':         return handleAddCategory(ss,e);
       case 'getMenuItems':        return handleGetMenuItems(ss,e);
@@ -605,6 +609,19 @@ function handleUpdatePaymentMode(ss,e) {
   if(!pmCol) return ok({success:false,error:'PaymentMode column not found'});
   sheet.getRange(rowIndex,pmCol).setValue(newMode);
   return ok({success:true});
+}
+
+/* ═══════════════════════════════════════
+   GLOBAL EXPENSE HELPER
+   Patches melaId into a JSON data string so global expense
+   actions can reuse the existing per-mela handlers.
+═══════════════════════════════════════ */
+function patchMelaId(dataStr, melaId) {
+  try {
+    const obj = JSON.parse(dataStr);
+    obj.melaId = melaId;
+    return JSON.stringify(obj);
+  } catch(e) { return dataStr; }
 }
 
 /* ═══════════════════════════════════════

@@ -92,6 +92,11 @@
   <button class="hs-fab hs-fab-gold" onclick="openModal('add')" aria-label="Add Mela"
     style="bottom:24px;">+</button>
 
+  <!-- FAB: Add Global Expense -->
+  <button class="hs-fab" onclick="openGlobalExpModal()"
+    aria-label="Add Global Expense"
+    style="bottom:24px;right:auto;left:24px;background:var(--green);font-size:22px;">💸</button>
+
   <!-- ADD / EDIT MODAL -->
   <div class="hs-modal-bg" id="melaModal">
     <div class="hs-modal">
@@ -137,6 +142,41 @@
       </div>
       <div class="hs-mt-sm">
         <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('melaModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GLOBAL EXPENSE MODAL -->
+  <div class="hs-modal-bg" id="globalExpModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title">Add Global Expense</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.5;">
+        💡 Global expenses are costs not tied to a specific mela — equipment, packaging stock, marketing, etc.
+      </div>
+
+      <div class="hs-field">
+        <label class="hs-label">Date *</label>
+        <input class="hs-input" type="date" id="gExpDate" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Category *</label>
+        <div id="gExpCatWrap"></div>
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Amount (₹) *</label>
+        <input class="hs-input" type="number" id="gExpAmount" min="0" placeholder="e.g. 5000" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Notes <span class="hs-opt">optional</span></label>
+        <input class="hs-input" type="text" id="gExpNotes" placeholder="Brief description…" autocomplete="off" />
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveGlobalExpense()">💾 Save Expense</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('globalExpModal')">Cancel</button>
       </div>
     </div>
   </div>
@@ -314,6 +354,93 @@
     }
 
     init();
+
+    /* ── GLOBAL EXPENSE ───────────────────── */
+    let gExpCats = [];
+
+    async function openGlobalExpModal() {
+      // Load categories lazily
+      if (!gExpCats.length) {
+        try {
+          const res = await HS.api({ action: 'getExpenseCategories' });
+          gExpCats = res.data || [];
+        } catch(e) { HS.toast('Could not load categories.', 'error', true); return; }
+      }
+      document.getElementById('gExpDate').value   = HS.today();
+      document.getElementById('gExpAmount').value = '';
+      document.getElementById('gExpNotes').value  = '';
+      document.getElementById('gExpCatWrap').innerHTML = gCatSelectHTML('gExpCatWrap', '');
+      HS.openModal('globalExpModal');
+    }
+
+    function gCatSelectHTML(wrapperId, selected) {
+      const opts = gExpCats.map(c =>
+        `<option value="${c}" ${c===selected?'selected':''}>${c}</option>`
+      ).join('');
+      return `
+        <select class="hs-input" id="${wrapperId}_sel" onchange="gOnCatChange('${wrapperId}')">
+          <option value="">-- Select category --</option>
+          ${opts}
+          <option value="__new__">＋ Add new category</option>
+        </select>
+        <div id="${wrapperId}_new" style="display:none;margin-top:8px;">
+          <div class="hs-row">
+            <input class="hs-input" type="text" id="${wrapperId}_inp"
+                   placeholder="New category name…" style="flex:1;" />
+            <button class="hs-btn hs-btn-primary hs-btn-sm" onclick="gConfirmNewCat('${wrapperId}')">Add</button>
+          </div>
+        </div>`;
+    }
+
+    function gOnCatChange(w) {
+      const nf = document.getElementById(w+'_new');
+      if (document.getElementById(w+'_sel').value === '__new__') {
+        nf.style.display = 'block';
+        document.getElementById(w+'_inp').focus();
+      } else { nf.style.display = 'none'; }
+    }
+
+    async function gConfirmNewCat(w) {
+      const name = document.getElementById(w+'_inp').value.trim();
+      if (!name) { HS.toast('Enter a category name.', 'error', true); return; }
+      try {
+        const res = await HS.api({ action: 'addExpenseCategory', name });
+        if (res.success) {
+          gExpCats.push(name);
+          document.getElementById(w).innerHTML = gCatSelectHTML(w, name);
+          HS.toast('✅ Category added!', 'success', true);
+        }
+      } catch(e) { HS.toast('Network error.', 'error', true); }
+    }
+
+    async function saveGlobalExpense() {
+      const date     = document.getElementById('gExpDate').value;
+      const sel      = document.getElementById('gExpCatWrap_sel');
+      const category = sel && sel.value !== '__new__' ? sel.value : '';
+      const amtVal   = document.getElementById('gExpAmount').value.trim();
+      const notes    = document.getElementById('gExpNotes').value.trim();
+
+      if (!date)     { HS.toast('Date is required.', 'error', true);     return; }
+      if (!category) { HS.toast('Category is required.', 'error', true); return; }
+      if (!amtVal)   { HS.toast('Amount is required.', 'error', true);   return; }
+      const amount = Number(amtVal);
+      if (isNaN(amount) || amount < 0) { HS.toast('Enter a valid amount.', 'error', true); return; }
+
+      HS.closeModal('globalExpModal');
+      HS.loading(true, 'Saving…');
+      try {
+        const res = await HS.api({
+          action: 'addGlobalExpense',
+          data:   JSON.stringify({ date, category, amount, notes }),
+        });
+        if (res.success) {
+          HS.toast('✅ Global expense saved!', 'success', true);
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error', true);
+        }
+      } catch(e) { HS.toast('Network error.', 'error', true); }
+      finally { HS.loading(false); }
+    }
   </script>
 </body>
 </html>

@@ -22,10 +22,8 @@
   <header class="hs-header" id="hs-header"></header>
 
   <div class="hs-top-tabs">
-    <button class="hs-tab active"  onclick="switchTab('mela',    this)">This Mela</button>
-    <button class="hs-tab"         onclick="switchTab('compare', this)">Mela vs Mela</button>
-    <button class="hs-tab"         onclick="switchTab('all',     this)">All Melas</button>
-    <button class="hs-tab"         onclick="switchTab('pl',      this)">P&amp;L</button>
+    <button class="hs-tab active" onclick="switchTab('mela', this)">This Mela</button>
+    <button class="hs-tab"        onclick="switchTab('all',  this)">All Melas</button>
   </div>
 
   <main class="hs-page">
@@ -38,7 +36,12 @@
         <div class="day-chips" id="dayChips"></div>
       </div>
       <div class="hs-stat-grid">
-        <div class="hs-stat-box s-green"><div class="hs-stat-num" id="sTotal">₹0</div> <div class="hs-stat-lbl">Revenue</div></div>
+        <div class="hs-stat-box s-green" onclick="HS.navigate('transactions.html')" style="cursor:pointer;" title="View transactions"><div class="hs-stat-num" id="sTotal">₹0</div>   <div class="hs-stat-lbl">Revenue ↗</div></div>
+        <div class="hs-stat-box s-red" onclick="HS.navigate('expenses.html')" style="cursor:pointer;" title="View expenses"><div class="hs-stat-num" id="sExpenses">₹0</div><div class="hs-stat-lbl">Expenses ↗</div></div>
+        <div class="hs-stat-box" id="sPLBox" style="grid-column:1/-1;">
+          <div class="hs-stat-num" id="sPL">₹0</div><div class="hs-stat-lbl" id="sPLLbl">Net P&amp;L</div>
+        </div>
+
         <div class="hs-stat-box">       <div class="hs-stat-num" id="sOrders">0</div>  <div class="hs-stat-lbl">Orders</div></div>
         <div class="hs-stat-box">       <div class="hs-stat-num" id="sCash">₹0</div>   <div class="hs-stat-lbl">Cash</div></div>
         <div class="hs-stat-box s-gold"><div class="hs-stat-num" id="sOnline">₹0</div> <div class="hs-stat-lbl">Online</div></div>
@@ -52,22 +55,10 @@
       <div class="hs-card"><div class="hs-card-title">💳 Cash vs Online — Orders</div><div class="chart-wrap short"><canvas id="chartPayment"></canvas></div></div>
     </div>
 
-    <!-- TAB 2: MELA VS MELA -->
-    <div class="tab-panel" id="panel-compare">
-      <button class="hs-btn hs-btn-secondary hs-btn-full hs-mb" style="margin-top:0;" onclick="loadAllData(true)">🔄 Refresh</button>
-      <div id="compareContent"><div style="text-align:center;padding:32px;color:var(--text-muted);">Tap Refresh to load comparison data.</div></div>
-    </div>
-
-    <!-- TAB 3: ALL MELAS -->
+    <!-- TAB 2: ALL MELAS -->
     <div class="tab-panel" id="panel-all">
       <button class="hs-btn hs-btn-secondary hs-btn-full hs-mb" style="margin-top:0;" onclick="loadAllData(true)">🔄 Refresh</button>
       <div id="allContent"><div style="text-align:center;padding:32px;color:var(--text-muted);">Tap Refresh to load all-mela data.</div></div>
-    </div>
-
-    <!-- TAB 4: P&L -->
-    <div class="tab-panel" id="panel-pl">
-      <button class="hs-btn hs-btn-secondary hs-btn-full hs-mb" style="margin-top:0;" onclick="loadPL(true)">🔄 Refresh</button>
-      <div id="plContent"><div style="text-align:center;padding:32px;color:var(--text-muted);">Tap Refresh to load P&amp;L data.</div></div>
     </div>
 
   </main>
@@ -96,7 +87,6 @@
     let itemMap   = {};     // itemKey → {ItemName, SellingPrice}
     let selDay    = 'all';
     let allCache  = null;
-    let plCache   = null;
     let globalItems = [];
     let myCharts  = {};
     let curTab    = 'mela';
@@ -143,20 +133,20 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       el.classList.add('active');
       document.getElementById('panel-' + tab).classList.add('active');
-      if ((tab === 'compare' || tab === 'all') && !allCache) loadAllData(false);
-      else if (tab === 'compare') renderCompare();
+      if (tab === 'all' && !allCache) loadAllData(false);
       else if (tab === 'all') renderAll();
-      else if (tab === 'pl' && !plCache) loadPL(false);
-      else if (tab === 'pl') renderPL();
     }
 
     /* ═══ TAB 1 — THIS MELA ═══ */
+    let melaExpenses = 0; // total expenses for current mela
+
     async function loadMelaData() {
       HS.loading(true, 'Loading data…');
       try {
-        const [menuRes, dataRes] = await Promise.all([
+        const [menuRes, dataRes, expRes] = await Promise.all([
           HS.api({ action: 'getMelaMenu', melaId: mela.MelaId }),
           HS.api({ action: 'getData',     melaId: mela.MelaId }),
+          HS.api({ action: 'getExpenses', melaId: mela.MelaId }),
         ]);
         melaMenu = menuRes.data || [];
         itemMap  = {};
@@ -167,8 +157,9 @@
           if (!itemMap[key]) itemMap[key] = { name: col, price: 0 };
         });
 
-        melaRows = (dataRes.data || []).map(r => normalizeRow({ ...r, Date: HS.normDate(r.Date) }));
-        selDay   = 'all';
+        melaRows     = (dataRes.data || []).map(r => normalizeRow({ ...r, Date: HS.normDate(r.Date) }));
+        melaExpenses = (expRes.data || []).reduce((s, e) => s + Number(e.Amount || 0), 0);
+        selDay       = 'all';
         buildDayChips();
         renderMelaDash();
       } catch(e) {
@@ -207,12 +198,25 @@
       const infRev    = infRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online')
                                .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
 
-      document.getElementById('sTotal').textContent  = '₹'+HS.fmt(revenue);
-      document.getElementById('sOrders').textContent = rows.length;
-      document.getElementById('sCash').textContent   = '₹'+HS.fmt(cashRev);
-      document.getElementById('sOnline').textContent = '₹'+HS.fmt(onlineRev);
-      document.getElementById('sPending').textContent= '₹'+HS.fmt(orgPending);
-      document.getElementById('sFree').textContent   = '₹'+HS.fmt(freeVal);
+      // Expenses are for the full mela (not day-filtered) — expenses are a fixed mela cost
+      const expenses = melaExpenses;
+      const pl       = revenue - expenses;
+      const isProfit = pl >= 0;
+
+      document.getElementById('sTotal').textContent    = '₹'+HS.fmt(revenue);
+      document.getElementById('sExpenses').textContent = '₹'+HS.fmt(expenses);
+
+      const plBox = document.getElementById('sPLBox');
+      plBox.className = 'hs-stat-box ' + (isProfit ? 's-green' : 's-red');
+      plBox.style.gridColumn = '1/-1';
+      document.getElementById('sPL').textContent   = (isProfit ? '' : '−') + '₹' + HS.fmt(Math.abs(pl));
+      document.getElementById('sPLLbl').textContent = 'Net ' + (isProfit ? 'Profit' : 'Loss');
+
+      document.getElementById('sOrders').textContent  = rows.length;
+      document.getElementById('sCash').textContent    = '₹'+HS.fmt(cashRev);
+      document.getElementById('sOnline').textContent  = '₹'+HS.fmt(onlineRev);
+      document.getElementById('sPending').textContent = '₹'+HS.fmt(orgPending);
+      document.getElementById('sFree').textContent    = '₹'+HS.fmt(freeVal);
 
       const infNote = document.getElementById('infNote');
       if (infRev>0) { infNote.style.display='block'; infNote.textContent=`⭐ Influencer refund: ₹${HS.fmt(infRev)} (${infRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online').length} orders)`; }
@@ -259,116 +263,196 @@
     }
 
     /* ═══ TAB 2 & 3 — ALL MELAS ═══ */
+    /* ═══ TAB 2 — ALL MELAS ═══ */
     async function loadAllData(force=false) {
-      if (allCache && !force) { renderCompare(); renderAll(); return; }
+      if (allCache && !force) { renderAll(); return; }
       HS.loading(true, 'Loading all melas…');
-      document.getElementById('compareContent').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted);">⏳ Fetching…</div>';
-      document.getElementById('allContent').innerHTML     = '<div style="text-align:center;padding:32px;color:var(--text-muted);">⏳ Fetching…</div>';
+      document.getElementById('allContent').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted);">⏳ Fetching…</div>';
       try {
-        const [melasRes, globalRes] = await Promise.all([
+        const [melasRes, menuRes, globalExpRes] = await Promise.all([
           HS.api({ action: 'getMelas' }),
           HS.api({ action: 'getMenuItems' }),
+          HS.api({ action: 'getGlobalExpenses' }),
         ]);
-        const allMelas = (melasRes.data||[]).map(m=>({...m, DateFrom:HS.normDate(m.DateFrom), DateTo:HS.normDate(m.DateTo)})).reverse();
-        globalItems    = globalRes.data || [];
+        const allMelas  = (melasRes.data||[]).map(m=>({...m, DateFrom:HS.normDate(m.DateFrom), DateTo:HS.normDate(m.DateTo)})).reverse();
+        globalItems     = menuRes.data || [];
+        const globalExp = (globalExpRes.data||[]).reduce((s,e)=>s+Number(e.Amount||0), 0);
 
         // Build global item map
         const gItemMap = {};
         globalItems.forEach(it => { gItemMap[it.ItemKey] = { name: it.ItemName, price: Number(it.DefaultPrice)||0, category: it.Category||'Uncategorised' }; });
         Object.entries(OLD_COL_TO_KEY).forEach(([col,key]) => { if (!gItemMap[key]) gItemMap[key]={name:col,price:0,category:'Uncategorised'}; });
 
-        // Fetch purchases for all melas
-        const purchases = {};
+        // Fetch purchases + per-mela expenses for all melas in parallel
+        const purchases    = {};
+        const melaExpenses = {};
         await Promise.all(allMelas.map(async m => {
           try {
-            const res = await HS.api({ action:'getData', melaId: m.MelaId });
-            purchases[m.MelaId] = (res.data||[]).map(r=>normalizeRow({...r,Date:HS.normDate(r.Date)}));
-          } catch { purchases[m.MelaId]=[]; }
+            const [dataRes, expRes] = await Promise.all([
+              HS.api({ action: 'getData',       melaId: m.MelaId }),
+              HS.api({ action: 'getExpenses',   melaId: m.MelaId }),
+            ]);
+            purchases[m.MelaId]    = (dataRes.data||[]).map(r=>normalizeRow({...r,Date:HS.normDate(r.Date)}));
+            melaExpenses[m.MelaId] = (expRes.data||[]).reduce((s,e)=>s+Number(e.Amount||0), 0);
+          } catch {
+            purchases[m.MelaId]    = [];
+            melaExpenses[m.MelaId] = 0;
+          }
         }));
 
-        allCache = { melas: allMelas, purchases, gItemMap };
-        renderCompare(); renderAll();
+        allCache = { melas: allMelas, purchases, gItemMap, melaExpenses, globalExp };
+        renderAll();
       } catch(e) { HS.toast('Could not load all data.','error'); }
       finally { HS.loading(false); }
     }
 
-    function renderCompare() {
-      if (!allCache) return;
-      const { melas, purchases } = allCache;
-      if (!melas.length) { document.getElementById('compareContent').innerHTML='<div style="text-align:center;padding:32px;color:var(--text-muted);">No melas found.</div>'; return; }
-
-      const stats = melas.map((m,i) => {
-        const rows    = purchases[m.MelaId]||[];
-        const paying  = rows.filter(r=>r.CustomerType!=='influencer');
-        const revenue = rows.reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-        return { name:m.MelaName, revenue, orders:rows.length,
-          cashRev:   paying.filter(r=>r.PaymentMode==='cash')  .reduce((s,r)=>s+Number(r.TotalAmount||0),0),
-          onlineRev: paying.filter(r=>r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0),
-          color: MELA_PALETTE[i%MELA_PALETTE.length] };
-      });
-
-      const labels = stats.map(s=>s.name);
-      const colors = stats.map(s=>s.color);
-      document.getElementById('compareContent').innerHTML = `
-        <div class="hs-card"><div class="hs-card-title">💰 Revenue per Mela</div>  <div class="chart-wrap tall"><canvas id="cmpRevenue"></canvas></div></div>
-        <div class="hs-card"><div class="hs-card-title">🧾 Orders per Mela</div>   <div class="chart-wrap"><canvas id="cmpOrders"></canvas></div></div>
-        <div class="hs-card"><div class="hs-card-title">💵 Cash per Mela</div>     <div class="chart-wrap"><canvas id="cmpCash"></canvas></div></div>
-        <div class="hs-card"><div class="hs-card-title">📱 Online per Mela</div>   <div class="chart-wrap"><canvas id="cmpOnline"></canvas></div></div>`;
-      drawHBar('cmpRevenue',labels,stats.map(s=>s.revenue), colors,true);
-      drawHBar('cmpOrders', labels,stats.map(s=>s.orders),  colors);
-      drawHBar('cmpCash',   labels,stats.map(s=>s.cashRev), colors,true);
-      drawHBar('cmpOnline', labels,stats.map(s=>s.onlineRev),colors,true);
-    }
-
     function renderAll() {
       if (!allCache) return;
-      const { melas, purchases, gItemMap } = allCache;
-      const allRows   = Object.values(purchases).flat();
-      const paying    = allRows.filter(r=>r.CustomerType!=='influencer');
-      const infRows   = allRows.filter(r=>r.CustomerType==='influencer');
-      const revenue   = allRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const cashRev   = allRows.filter(r=>r.PaymentMode==='cash')      .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const onlineRev = allRows.filter(r=>r.PaymentMode==='online')    .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const orgPending= allRows.filter(r=>r.PaymentMode==='organiser') .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const freeVal   = allRows.filter(r=>r.PaymentMode==='free')      .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
-      const infRev    = allRows.filter(r=>r.CustomerType==='influencer'&&(r.PaymentMode==='cash'||r.PaymentMode==='online')).reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const { melas, purchases, gItemMap, melaExpenses, globalExp } = allCache;
 
-      // Aggregate all items — use stored price if available
-      const counts={}, revenues={};
+      const allRows    = Object.values(purchases).flat();
+      const revenue    = allRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const cashRev    = allRows.filter(r=>r.PaymentMode==='cash').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const onlineRev  = allRows.filter(r=>r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const orgPending = allRows.filter(r=>r.PaymentMode==='organiser').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const freeVal    = allRows.filter(r=>r.PaymentMode==='free').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+      const infRev     = allRows.filter(r=>r.CustomerType==='influencer'&&(r.PaymentMode==='cash'||r.PaymentMode==='online')).reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+
+      const totalMelaExp = Object.values(melaExpenses).reduce((s,v)=>s+v, 0);
+      const totalExp     = totalMelaExp + globalExp;
+      const totalPL      = revenue - totalExp;
+      const plClass      = totalPL >= 0 ? 's-green' : 's-red';
+      const active       = melas.filter(m=>m.Status!=='archived').length;
+
+      // Per-mela P&L data
+      const plData = melas.map(m => {
+        const rows    = purchases[m.MelaId]||[];
+        const rev     = rows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online').reduce((s,r)=>s+Number(r.TotalAmount||0),0);
+        const exp     = melaExpenses[m.MelaId]||0;
+        const profit  = rev - exp;
+        const isCur   = m.MelaId === mela.MelaId;
+        return { name: m.MelaName, revenue: rev, expenses: exp, profit, orders: rows.length, isCur };
+      });
+
+      // Aggregate all items
+      const counts={}, itemRevenues={};
       allRows.forEach(row => {
         Object.entries(row._items||{}).forEach(([key,val]) => {
           const q = val.qty || 0;
           const p = val.price !== null ? val.price : (gItemMap[key]?.price || 0);
-          counts[key]   = (counts[key]||0) + q;
-          revenues[key] = (revenues[key]||0) + q * p;
+          counts[key]       = (counts[key]||0) + q;
+          itemRevenues[key] = (itemRevenues[key]||0) + q * p;
         });
       });
-
       const allKeys  = Object.keys(counts).filter(k=>counts[k]>0);
-      const labels   = allKeys.map(k=>gItemMap[k]?.name||k);
-      const colors   = allKeys.map((_,i)=>MELA_PALETTE[i%MELA_PALETTE.length]);
-      const active   = melas.filter(m=>m.Status!=='archived').length;
-      const archived = melas.filter(m=>m.Status==='archived').length;
+      const iLabels  = allKeys.map(k=>gItemMap[k]?.name||k);
+      const iColors  = allKeys.map((_,i)=>MELA_PALETTE[i%MELA_PALETTE.length]);
+      const mLabels  = plData.map(d=>d.name);
+      const mColors  = plData.map((_,i)=>MELA_PALETTE[i%MELA_PALETTE.length]);
+
+      // Build per-mela P&L rows HTML
+      let plRows = '';
+      plData.forEach(d => {
+        const ip = d.profit >= 0;
+        const pct = d.revenue > 0 ? Math.round(d.profit/d.revenue*100) : 0;
+        plRows += `
+          <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--brown);">
+                  ${d.name}${d.isCur?' <span style="font-size:10px;color:var(--gold);">● current</span>':''}
+                </div>
+                <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">
+                  Rev ₹${HS.fmt(d.revenue)} &nbsp;·&nbsp; Exp ₹${HS.fmt(d.expenses)}
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;
+                            color:${ip?'var(--green)':'var(--red)'};">
+                  ${ip?'+':'−'}₹${HS.fmt(Math.abs(d.profit))}
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);">${ip?'Profit':'Loss'}${pct!==0?' ('+Math.abs(pct)+'%)':''}</div>
+              </div>
+            </div>
+          </div>`;
+      });
+
+      const chartH = Math.max(120, plData.length * 55) + 'px';
 
       document.getElementById('allContent').innerHTML = `
         <div class="hs-stat-grid">
           <div class="hs-stat-box s-green"><div class="hs-stat-num">₹${HS.fmt(revenue)}</div>    <div class="hs-stat-lbl">Total Revenue</div></div>
+          <div class="hs-stat-box s-red">  <div class="hs-stat-num">₹${HS.fmt(totalExp)}</div>   <div class="hs-stat-lbl">Total Expenses</div></div>
+          <div class="hs-stat-box ${plClass}" style="grid-column:1/-1;">
+            <div class="hs-stat-num">${totalPL>=0?'':'−'}₹${HS.fmt(Math.abs(totalPL))}</div>
+            <div class="hs-stat-lbl">Net ${totalPL>=0?'Profit':'Loss'} — All Melas</div>
+          </div>
           <div class="hs-stat-box">        <div class="hs-stat-num">${allRows.length}</div>        <div class="hs-stat-lbl">Total Orders</div></div>
           <div class="hs-stat-box">        <div class="hs-stat-num">₹${HS.fmt(cashRev)}</div>    <div class="hs-stat-lbl">Cash</div></div>
           <div class="hs-stat-box s-gold"> <div class="hs-stat-num">₹${HS.fmt(onlineRev)}</div>  <div class="hs-stat-lbl">Online</div></div>
           <div class="hs-stat-box s-red">  <div class="hs-stat-num">₹${HS.fmt(orgPending)}</div> <div class="hs-stat-lbl">Org. Pending</div></div>
           <div class="hs-stat-box">        <div class="hs-stat-num">${active}</div>               <div class="hs-stat-lbl">Active Melas</div></div>
         </div>
+        ${globalExp>0?`<div class="inf-note hs-mb" style="color:var(--text-muted)">🌐 Global expenses included: ₹${HS.fmt(globalExp)}</div>`:''}
         ${infRev>0?`<div class="inf-note hs-mb">⭐ Total influencer refunds: ₹${HS.fmt(infRev)}</div>`:''}
         ${freeVal>0?`<div class="inf-note hs-mb" style="color:var(--text-muted)">🎁 Total free given: ₹${HS.fmt(freeVal)}</div>`:''}
-        <div class="hs-card"><div class="hs-card-title">📦 Items Sold — All Melas</div>    <div class="chart-wrap tall"><canvas id="allCount"></canvas></div></div>
-        <div class="hs-card"><div class="hs-card-title">💰 Revenue by Item — All Melas</div><div class="chart-wrap tall"><canvas id="allRevenue"></canvas></div></div>
-        <div class="hs-card"><div class="hs-card-title">💳 Payment Breakdown — All Melas</div><div class="chart-wrap short"><canvas id="allPayment"></canvas></div></div>`;
-      drawHBar('allCount',  labels,allKeys.map(k=>counts[k]),   colors);
-      drawHBar('allRevenue',labels,allKeys.map(k=>revenues[k]), colors,true);
-      drawHBar('allPayment',['Cash','Online','Organiser (Pending)','Free'],
-        [allRows.filter(r=>r.PaymentMode==='cash').length, allRows.filter(r=>r.PaymentMode==='online').length,
-         allRows.filter(r=>r.PaymentMode==='organiser').length, allRows.filter(r=>r.PaymentMode==='free').length],
+
+        <div class="hs-card"><div class="hs-card-title">📊 Mela-wise P&L</div>${plRows}</div>
+
+        <div class="hs-card"><div class="hs-card-title">💰 Revenue vs Expenses</div>
+          <div class="chart-wrap" style="height:${chartH};"><canvas id="allRevExp"></canvas></div></div>
+
+        <div class="hs-card"><div class="hs-card-title">🧾 Orders per Mela</div>
+          <div class="chart-wrap" style="height:${chartH};"><canvas id="allOrders"></canvas></div></div>
+
+        <div class="hs-card"><div class="hs-card-title">📦 Items Sold — All Melas</div>
+          <div class="chart-wrap tall"><canvas id="allCount"></canvas></div></div>
+
+        <div class="hs-card"><div class="hs-card-title">💰 Revenue by Item — All Melas</div>
+          <div class="chart-wrap tall"><canvas id="allRevenue"></canvas></div></div>
+
+        <div class="hs-card"><div class="hs-card-title">💳 Payment Breakdown — All Melas</div>
+          <div class="chart-wrap short"><canvas id="allPayment"></canvas></div></div>`;
+
+      // Revenue vs Expenses grouped bar (per mela)
+      if (myCharts['allRevExp']) myCharts['allRevExp'].destroy();
+      const revExpCtx = document.getElementById('allRevExp')?.getContext('2d');
+      if (revExpCtx) {
+        myCharts['allRevExp'] = new Chart(revExpCtx, {
+          type: 'bar',
+          data: {
+            labels: mLabels,
+            datasets: [
+              { label:'Revenue',  data: plData.map(d=>d.revenue),  backgroundColor:'#3D6338' },
+              { label:'Expenses', data: plData.map(d=>d.expenses), backgroundColor:'#B83225' },
+            ]
+          },
+          options: {
+            indexAxis: 'y', responsive:true, maintainAspectRatio:false,
+            plugins: { legend:{ position:'top', labels:{font:{family:'Nunito',size:12}} },
+                       tooltip:{ callbacks:{ label: ctx => ` ₹${HS.fmt(ctx.parsed.x)}` } } },
+            scales: {
+              x: { beginAtZero:true, ticks:{ callback:v=>'₹'+HS.fmt(v), font:{family:'Nunito',size:11} } },
+              y: { ticks:{ font:{family:'Nunito',size:11} } },
+            }
+          }
+        });
+      }
+
+      // Orders per mela
+      drawHBar('allOrders', mLabels, plData.map(d=>d.orders), mColors);
+
+      // Items & revenue
+      drawHBar('allCount',   iLabels, allKeys.map(k=>counts[k]),        iColors);
+      drawHBar('allRevenue', iLabels, allKeys.map(k=>itemRevenues[k]),  iColors, true);
+
+      // Payment breakdown
+      drawHBar('allPayment',
+        ['Cash','Online','Organiser (Pending)','Free'],
+        [ allRows.filter(r=>r.PaymentMode==='cash').length,
+          allRows.filter(r=>r.PaymentMode==='online').length,
+          allRows.filter(r=>r.PaymentMode==='organiser').length,
+          allRows.filter(r=>r.PaymentMode==='free').length ],
         ['#3D6338','#C4841A','#B83225','#A09070']);
     }
 
@@ -401,120 +485,6 @@
       });
     }
 
-    /* ═══ TAB 4 — P&L ═══ */
-    async function loadPL(force) {
-      if (plCache && !force) { renderPL(); return; }
-      HS.loading(true, 'Loading P&L…');
-      try {
-        // Load all non-archived melas
-        const melasRes = await HS.api({ action: 'getMelas' });
-        const allMelas = (melasRes.data || []).filter(m => m.Status !== 'archived').reverse();
-
-        // For each mela, load purchases + expenses in parallel
-        const results = await Promise.all(allMelas.map(async m => {
-          const [dataRes, expRes] = await Promise.all([
-            HS.api({ action: 'getData',       melaId: m.MelaId }),
-            HS.api({ action: 'getExpenses',    melaId: m.MelaId }),
-          ]);
-          const rows     = (dataRes.data || []).map(normalizeRow);
-          const revenue  = rows.filter(r => r.PaymentMode==='cash'||r.PaymentMode==='online')
-                               .reduce((s,r) => s+Number(r.TotalAmount||0), 0);
-          const expenses = (expRes.data || []).reduce((s,e) => s+Number(e.Amount||0), 0);
-          return { mela: m, revenue, expenses, profit: revenue - expenses };
-        }));
-
-        plCache = results;
-        renderPL();
-      } catch(e) { HS.toast('Could not load P&L data.', 'error'); }
-      finally { HS.loading(false); }
-    }
-
-    function renderPL() {
-      if (!plCache) return;
-      const data = plCache;
-
-      const totalRev  = data.reduce((s,d) => s+d.revenue,  0);
-      const totalExp  = data.reduce((s,d) => s+d.expenses, 0);
-      const totalProf = totalRev - totalExp;
-      const profClass = totalProf >= 0 ? 's-green' : 's-red';
-
-      // Find current mela entry
-      const cur = data.find(d => d.mela.MelaId === mela.MelaId);
-
-      let html = `
-        <div class="hs-stat-grid">
-          <div class="hs-stat-box s-green"><div class="hs-stat-num">₹${HS.fmt(totalRev)}</div>  <div class="hs-stat-lbl">Total Revenue</div></div>
-          <div class="hs-stat-box s-red">  <div class="hs-stat-num">₹${HS.fmt(totalExp)}</div>  <div class="hs-stat-lbl">Total Expenses</div></div>
-          <div class="hs-stat-box ${profClass} " style="grid-column:1/-1;">
-            <div class="hs-stat-num">${totalProf>=0?'':'−'}₹${HS.fmt(Math.abs(totalProf))}</div>
-            <div class="hs-stat-lbl">Net ${totalProf>=0?'Profit':'Loss'} — All Melas</div>
-          </div>
-        </div>`;
-
-      // Per-mela table
-      html += `<div class="hs-card"><div class="hs-card-title">📊 Mela-wise P&L</div>`;
-      data.forEach(d => {
-        const profit  = d.profit;
-        const isProfit = profit >= 0;
-        const pct = d.revenue > 0 ? Math.round(profit/d.revenue*100) : 0;
-        const isCur = d.mela.MelaId === mela.MelaId;
-        html += `
-          <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-              <div>
-                <div style="font-weight:700;font-size:13px;color:var(--brown);">
-                  ${d.mela.MelaName}${isCur?' <span style="font-size:10px;color:var(--gold);">● current</span>':''}
-                </div>
-                <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">
-                  Rev ₹${HS.fmt(d.revenue)} &nbsp;·&nbsp; Exp ₹${HS.fmt(d.expenses)}
-                </div>
-              </div>
-              <div style="text-align:right;flex-shrink:0;">
-                <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;
-                            color:${isProfit?'var(--green)':'var(--red)'};">
-                  ${isProfit?'+':'−'}₹${HS.fmt(Math.abs(profit))}
-                </div>
-                <div style="font-size:11px;color:var(--text-muted);">${isProfit?'Profit':'Loss'} ${pct!==0?'('+Math.abs(pct)+'%)':''}</div>
-              </div>
-            </div>
-          </div>`;
-      });
-      html += `</div>`;
-
-      // Revenue vs Expenses bar chart
-      if (data.length > 0) {
-        html += `<div class="hs-card"><div class="hs-card-title">💰 Revenue vs Expenses</div><div class="chart-wrap" style="height:${Math.max(120,data.length*55)}px;"><canvas id="plChart"></canvas></div></div>`;
-      }
-
-      document.getElementById('plContent').innerHTML = html;
-
-      // Draw grouped bar chart
-      if (data.length > 0) {
-        const ctx = document.getElementById('plChart')?.getContext('2d');
-        if (ctx) {
-          if (myCharts['plChart']) myCharts['plChart'].destroy();
-          myCharts['plChart'] = new Chart(ctx, {
-            type: 'bar',
-            data: {
-              labels: data.map(d => d.mela.MelaName.length>15 ? d.mela.MelaName.slice(0,15)+'…' : d.mela.MelaName),
-              datasets: [
-                { label:'Revenue',  data: data.map(d=>d.revenue),  backgroundColor:'#3D6338' },
-                { label:'Expenses', data: data.map(d=>d.expenses), backgroundColor:'#B83225' },
-              ]
-            },
-            options: {
-              indexAxis: 'y',
-              responsive: true, maintainAspectRatio: false,
-              plugins: { legend:{ position:'top', labels:{font:{family:'Nunito',size:12}} } },
-              scales: {
-                x: { beginAtZero:true, ticks:{callback:v=>'₹'+HS.fmt(v),font:{family:'Nunito',size:11}} },
-                y: { ticks:{font:{family:'Nunito',size:11}} },
-              }
-            }
-          });
-        }
-      }
-    }
   </script>
 </body>
 </html>
