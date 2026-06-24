@@ -23,6 +23,11 @@
    CONSTANTS
 ═══════════════════════════════════════ */
 const MELAS_SHEET            = 'Melas';
+const RAW_MATERIALS_SHEET    = 'RawMaterials';
+const RAW_PURCHASES_SHEET    = 'RawMaterialPurchases';
+
+const RAW_MATERIALS_HEADERS  = ['RawMaterialId','Name','Unit','TotalQty','Status','CreatedAt'];
+const RAW_PURCHASES_HEADERS  = ['PurchaseId','RawMaterialId','Qty','Cost','PurchasedAt','Note'];
 const MENU_ITEMS_SHEET       = 'MenuItems';
 const MELA_MENU_SHEET        = 'MelaMenu';
 const CATEGORIES_SHEET       = 'Categories';
@@ -216,6 +221,47 @@ function sheetToObjects(sheet) {
 }
 
 /* ═══════════════════════════════════════
+   RAW MATERIAL SHEET HELPERS
+═══════════════════════════════════════ */
+function getRawMaterialsSheet(ss) {
+  let s = ss.getSheetByName(RAW_MATERIALS_SHEET);
+  if (!s) {
+    s = ss.insertSheet(RAW_MATERIALS_SHEET);
+    s.appendRow(RAW_MATERIALS_HEADERS);
+    styleHeader(s, RAW_MATERIALS_HEADERS.length);
+  }
+  return s;
+}
+
+function getRawPurchasesSheet(ss) {
+  let s = ss.getSheetByName(RAW_PURCHASES_SHEET);
+  if (!s) {
+    s = ss.insertSheet(RAW_PURCHASES_SHEET);
+    s.appendRow(RAW_PURCHASES_HEADERS);
+    styleHeader(s, RAW_PURCHASES_HEADERS.length);
+  }
+  return s;
+}
+
+/* Adjust TotalQty on RawMaterials by delta (positive or negative) */
+function adjustRawMaterialQty(ss, rawMaterialId, delta) {
+  const sheet = getRawMaterialsSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol  = hdrs.indexOf('RawMaterialId');
+  const qtyCol = hdrs.indexOf('TotalQty');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === rawMaterialId) {
+      const cur = Number(rows[i][qtyCol]) || 0;
+      sheet.getRange(i + 1, qtyCol + 1).setValue(cur + delta);
+      cDel('raw_materials');
+      return true;
+    }
+  }
+  return false;
+}
+
+/* ═══════════════════════════════════════
    MAIN ROUTER
 ═══════════════════════════════════════ */
 function doGet(e) {
@@ -247,6 +293,15 @@ function doGet(e) {
       case 'restoreMelaMenuItem': return handleSetMenuStatus(ss,e,'active');
       case 'reorderMelaMenu':     return handleReorderMelaMenu(ss,e);
       case 'save':                return handleSavePurchase(ss,e);
+      // ── Raw Materials ──
+      case 'getRawMaterials':       return handleGetRawMaterials(ss,e);
+      case 'addRawMaterial':        return handleAddRawMaterial(ss,e);
+      case 'updateRawMaterial':     return handleUpdateRawMaterial(ss,e);
+      case 'setRawMaterialStatus':  return handleSetRawMaterialStatus(ss,e);
+      case 'getRawPurchases':       return handleGetRawPurchases(ss,e);
+      case 'addRawPurchase':        return handleAddRawPurchase(ss,e);
+      case 'updateRawPurchase':     return handleUpdateRawPurchase(ss,e);
+      case 'deleteRawPurchase':     return handleDeleteRawPurchase(ss,e);
       case 'getData':             return handleGetData(ss,e);
       case 'updatePaymentMode':   return handleUpdatePaymentMode(ss,e);
       default: return ok({success:false,error:'Unknown action: '+e.parameter.action});
@@ -609,6 +664,139 @@ function handleUpdatePaymentMode(ss,e) {
   if(!pmCol) return ok({success:false,error:'PaymentMode column not found'});
   sheet.getRange(rowIndex,pmCol).setValue(newMode);
   return ok({success:true});
+}
+
+/* ═══════════════════════════════════════
+   RAW MATERIAL HANDLERS
+═══════════════════════════════════════ */
+
+function handleGetRawMaterials(ss, e) {
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet('raw_materials');
+    if (hit) return ok({ data: hit });
+  }
+  const data = sheetToObjects(getRawMaterialsSheet(ss));
+  cPut('raw_materials', data);
+  return ok({ data });
+}
+
+function handleAddRawMaterial(ss, e) {
+  const d   = JSON.parse(e.parameter.data);
+  const id  = 'rm_' + Date.now();
+  const now = new Date().toISOString();
+  // TotalQty starts at 0 — qty comes in via purchase entries
+  getRawMaterialsSheet(ss).appendRow([id, d.name, d.unit, 0, 'active', now]);
+  cDel('raw_materials');
+  return ok({ success: true, rawMaterialId: id });
+}
+
+function handleUpdateRawMaterial(ss, e) {
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getRawMaterialsSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol = hdrs.indexOf('RawMaterialId');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === d.rawMaterialId) {
+      const set = (col, val) => { const c = hdrs.indexOf(col); if (c >= 0) sheet.getRange(i+1, c+1).setValue(val); };
+      if (d.name !== undefined) set('Name', d.name);
+      if (d.unit !== undefined) set('Unit', d.unit);
+      cDel('raw_materials');
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Raw material not found' });
+}
+
+function handleSetRawMaterialStatus(ss, e) {
+  const sheet  = getRawMaterialsSheet(ss);
+  const rows   = sheet.getDataRange().getValues();
+  const hdrs   = rows[0];
+  const idCol  = hdrs.indexOf('RawMaterialId');
+  const stCol  = hdrs.indexOf('Status');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === e.parameter.rawMaterialId) {
+      sheet.getRange(i + 1, stCol + 1).setValue(e.parameter.status);
+      cDel('raw_materials');
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Raw material not found' });
+}
+
+/* ── Raw Purchases ── */
+function handleGetRawPurchases(ss, e) {
+  const rmId = e.parameter.rawMaterialId;
+  const cKey = rmId ? 'raw_purchases_' + rmId : 'raw_purchases_all';
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  let data = sheetToObjects(getRawPurchasesSheet(ss));
+  if (rmId) data = data.filter(r => r.RawMaterialId === rmId);
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+function handleAddRawPurchase(ss, e) {
+  const d   = JSON.parse(e.parameter.data);
+  const id  = 'rp_' + Date.now();
+  const now = new Date().toISOString();
+  const qty = Number(d.qty) || 0;
+  getRawPurchasesSheet(ss).appendRow([id, d.rawMaterialId, qty, Number(d.cost)||0, d.purchasedAt||now, d.note||'']);
+  // Add qty to master
+  adjustRawMaterialQty(ss, d.rawMaterialId, qty);
+  cDel('raw_purchases_' + d.rawMaterialId, 'raw_purchases_all', 'raw_materials');
+  return ok({ success: true, purchaseId: id });
+}
+
+function handleUpdateRawPurchase(ss, e) {
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getRawPurchasesSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol = hdrs.indexOf('PurchaseId');
+  const qtyCol = hdrs.indexOf('Qty');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === d.purchaseId) {
+      const oldQty = Number(rows[i][qtyCol]) || 0;
+      const newQty = Number(d.qty) || 0;
+      const delta  = newQty - oldQty;
+      const set = (col, val) => { const c = hdrs.indexOf(col); if (c >= 0) sheet.getRange(i+1, c+1).setValue(val); };
+      set('Qty', newQty);
+      set('Cost', Number(d.cost) || 0);
+      set('PurchasedAt', d.purchasedAt || '');
+      set('Note', d.note || '');
+      // Adjust master qty by the difference
+      const rmId = rows[i][hdrs.indexOf('RawMaterialId')];
+      if (delta !== 0) adjustRawMaterialQty(ss, rmId, delta);
+      cDel('raw_purchases_' + rmId, 'raw_purchases_all', 'raw_materials');
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Purchase not found' });
+}
+
+function handleDeleteRawPurchase(ss, e) {
+  const sheet  = getRawPurchasesSheet(ss);
+  const rows   = sheet.getDataRange().getValues();
+  const hdrs   = rows[0];
+  const idCol  = hdrs.indexOf('PurchaseId');
+  const qtyCol = hdrs.indexOf('Qty');
+  const rmCol  = hdrs.indexOf('RawMaterialId');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === e.parameter.purchaseId) {
+      const rmId  = rows[i][rmCol];
+      const qty   = Number(rows[i][qtyCol]) || 0;
+      sheet.deleteRow(i + 1);
+      // Deleting a purchase always reverses the qty that was added when it was logged.
+      // (If material is spoilt, that is handled at the preparation stage, not here.)
+      adjustRawMaterialQty(ss, rmId, -qty);
+      cDel('raw_purchases_' + rmId, 'raw_purchases_all', 'raw_materials');
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Purchase not found' });
 }
 
 /* ═══════════════════════════════════════

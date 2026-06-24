@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Raw Materials — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    /* ── Units ── */
+    .unit-badge {
+      display: inline-block;
+      background: var(--gold-pale);
+      color: var(--brown);
+      border-radius: 20px;
+      padding: 2px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+
+    /* ── Material card ── */
+    .rm-card {
+      background: var(--cream-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-sm);
+    }
+    .rm-card.archived {
+      opacity: .55;
+      border-style: dashed;
+    }
+    .rm-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .rm-card-meta { flex: 1; min-width: 0; }
+    .rm-card-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--brown);
+      margin-bottom: 4px;
+    }
+    .rm-card-qty {
+      font-size: 22px;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+    }
+    .rm-card-qty.low { color: var(--red); }
+    .rm-card-qty-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .rm-card-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .rm-card-cost {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--brown-mid);
+    }
+    .rm-card-actions { display: flex; gap: 6px; margin-top: 4px; }
+    .rm-action-btn {
+      width: 32px; height: 32px;
+      border-radius: 8px; border: none;
+      font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: filter .18s;
+    }
+    .rm-action-btn:active { filter: brightness(.85); }
+    .rm-edit-btn     { background: rgba(61,99,56,.12); }
+    .rm-archive-btn  { background: rgba(184,50,37,.10); }
+    .rm-restore-btn  { background: rgba(61,99,56,.12); }
+    .rm-purchase-btn { background: rgba(196,132,26,.15); }
+
+    /* ── Purchases sub-list ── */
+    .rm-purchases {
+      margin-top: 10px;
+      border-top: 1px dashed var(--border);
+      padding-top: 8px;
+    }
+    .rm-purchase-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(0,0,0,.04);
+      gap: 8px;
+    }
+    .rm-purchase-row:last-child { border-bottom: none; }
+    .rm-purchase-date { font-size: 11.5px; color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+    .rm-purchase-detail { flex: 1; min-width: 0; font-size: 12.5px; color: var(--brown-mid); }
+    .rm-purchase-note { font-size: 11px; color: var(--text-muted); }
+    .rm-purchase-amount {
+      font-weight: 700; font-size: 13px; color: var(--brown);
+      flex-shrink: 0; text-align: right;
+    }
+    .rm-purchase-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .rm-purchase-action {
+      width: 26px; height: 26px;
+      border-radius: 6px; border: none;
+      font-size: 13px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rm-purchase-action:active { filter: brightness(.85); }
+
+    /* ── Summary bar ── */
+    .rm-summary {
+      background: linear-gradient(135deg, var(--brown) 0%, var(--brown-mid) 100%);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      color: #fff;
+      display: flex;
+      gap: 0;
+    }
+    .rm-summary-cell {
+      flex: 1;
+      text-align: center;
+    }
+    .rm-summary-cell + .rm-summary-cell {
+      border-left: 1px solid rgba(255,255,255,.2);
+    }
+    .rm-summary-val {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .rm-summary-lbl { font-size: 11px; opacity: .75; margin-top: 2px; }
+
+    /* ── Filter strip ── */
+    .rm-filter {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .rm-filter::-webkit-scrollbar { display: none; }
+    .rm-filter-btn {
+      flex-shrink: 0;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--cream-light);
+      font-size: 12px; font-weight: 700;
+      color: var(--brown-mid); cursor: pointer;
+    }
+    .rm-filter-btn.active {
+      background: var(--brown);
+      color: #fff;
+      border-color: var(--brown);
+    }
+
+    /* ── Section heading ── */
+    .rm-section-head {
+      font-family: 'Playfair Display', serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--brown-mid);
+      margin: 16px 0 8px;
+      padding-left: 2px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page">
+
+    <!-- Summary bar -->
+    <div class="rm-summary" id="rmSummary" style="display:none;">
+      <div class="rm-summary-cell">
+        <div class="rm-summary-val" id="sumCount">0</div>
+        <div class="rm-summary-lbl">Materials</div>
+      </div>
+      <div class="rm-summary-cell">
+        <div class="rm-summary-val" id="sumSpend">₹0</div>
+        <div class="rm-summary-lbl">Total Spend</div>
+      </div>
+    </div>
+
+    <!-- Filter strip -->
+    <div class="rm-filter">
+      <button class="rm-filter-btn active" onclick="setFilter('active',   this)">Active</button>
+      <button class="rm-filter-btn"        onclick="setFilter('archived', this)">Archived</button>
+      <button class="rm-filter-btn"        onclick="setFilter('all',      this)">All</button>
+    </div>
+
+    <!-- Material list -->
+    <div id="rmList">
+      <div class="hs-empty">
+        <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+        <div class="hs-empty-sub">Loading raw materials…</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FAB: Add Raw Material -->
+  <button class="hs-fab" onclick="openAddMaterial()" aria-label="Add Raw Material"
+    style="bottom:24px;">+</button>
+
+  <!-- ══ ADD / EDIT RAW MATERIAL MODAL ══ -->
+  <div class="hs-modal-bg" id="rmModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="rmModalTitle">Add Raw Material</div>
+      <input type="hidden" id="rmId" />
+
+      <div class="hs-field">
+        <label class="hs-label">Name *</label>
+        <input class="hs-input" type="text" id="rmName" placeholder="e.g. Raw Mango, 100gm Box…" autocomplete="off" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Unit *</label>
+        <select class="hs-input" id="rmUnit">
+          <option value="">-- Select unit --</option>
+          <optgroup label="Weight">
+            <option value="mg">mg (milligrams)</option>
+            <option value="gms">gms (grams)</option>
+            <option value="kg">kg (kilograms)</option>
+          </optgroup>
+          <optgroup label="Volume">
+            <option value="ml">ml (millilitres)</option>
+            <option value="litres">litres</option>
+          </optgroup>
+          <optgroup label="Count">
+            <option value="count">count (pieces / units)</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveMaterial()">💾 Save</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('rmModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ADD / EDIT PURCHASE MODAL ══ -->
+  <div class="hs-modal-bg" id="purchaseModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="purchaseModalTitle">Log Purchase</div>
+      <div class="hs-modal-subtitle" id="purchaseModalSub" style="font-size:12px;color:var(--text-muted);margin-bottom:14px;"></div>
+      <input type="hidden" id="purchaseId" />
+      <input type="hidden" id="purchaseRmId" />
+      <input type="hidden" id="purchaseUnit" />
+
+      <div class="hs-field">
+        <label class="hs-label">Date *</label>
+        <input class="hs-input" type="date" id="purchaseDate" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label" id="purchaseQtyLabel">Quantity *</label>
+        <input class="hs-input" type="number" id="purchaseQty" min="0" step="any"
+               placeholder="e.g. 80" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Total Cost (₹) *</label>
+        <input class="hs-input" type="number" id="purchaseCost" min="0" step="any"
+               placeholder="e.g. 3200" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Note <span class="hs-opt">optional</span></label>
+        <input class="hs-input" type="text" id="purchaseNote"
+               placeholder="Vendor name, batch info…" autocomplete="off" />
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="savePurchase()">💾 Save Purchase</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('purchaseModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/common.js"></script>
+  <script>
+    /* ── State ── */
+    let materials  = [];   // all raw materials from server
+    let purchases  = {};   // { rmId: [purchase, …] }
+    let expanded   = {};   // { rmId: bool } — purchase list open?
+    let curFilter  = 'active';
+
+    /* ── UNIT HELPERS ── */
+    const UNIT_GROUPS = {
+      weight: ['mg','gms','kg'],
+      volume: ['ml','litres'],
+      count:  ['count'],
+    };
+    const UNIT_FACTORS = { mg:0.001, gms:1, kg:1000, ml:1, litres:1000, count:1 };
+    const UNIT_BASE    = { mg:'gms', gms:'gms', kg:'gms', ml:'ml', litres:'ml', count:'count' };
+
+    function unitGroup(u) {
+      for (const [g, units] of Object.entries(UNIT_GROUPS))
+        if (units.includes(u)) return g;
+      return null;
+    }
+
+    /* ── INIT ── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      HS.renderHeader({ title: 'Raw Materials', showBack: true });
+      await loadAll();
+    });
+
+    /* ── LOAD ── */
+    async function loadAll() {
+      HS.loading(true, 'Loading raw materials…');
+      try {
+        const [rmRes, rpRes] = await Promise.all([
+          HS.api({ action: 'getRawMaterials' }),
+          HS.api({ action: 'getRawPurchases' }),
+        ]);
+        materials = rmRes.data || [];
+        purchases = {};
+        (rpRes.data || []).forEach(p => {
+          if (!purchases[p.RawMaterialId]) purchases[p.RawMaterialId] = [];
+          purchases[p.RawMaterialId].push(p);
+        });
+        // Sort purchases newest first
+        Object.values(purchases).forEach(arr =>
+          arr.sort((a,b) => (b.PurchasedAt||'').localeCompare(a.PurchasedAt||''))
+        );
+        renderList();
+        renderSummary();
+      } catch(e) {
+        HS.toast('Could not load raw materials.', 'error');
+      } finally { HS.loading(false); }
+    }
+
+    /* ── SUMMARY ── */
+    function renderSummary() {
+      const active = materials.filter(m => m.Status !== 'archived');
+      let totalSpend = 0;
+      Object.values(purchases).forEach(arr =>
+        arr.forEach(p => { totalSpend += Number(p.Cost || 0); })
+      );
+      document.getElementById('sumCount').textContent = active.length;
+      document.getElementById('sumSpend').textContent = '₹' + HS.fmt(totalSpend);
+      document.getElementById('rmSummary').style.display = active.length ? '' : 'none';
+    }
+
+    /* ── FILTER ── */
+    function setFilter(f, el) {
+      curFilter = f;
+      document.querySelectorAll('.rm-filter-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+      renderList();
+    }
+
+    /* ── RENDER LIST ── */
+    function renderList() {
+      const filtered = materials.filter(m => {
+        if (curFilter === 'active')   return m.Status !== 'archived';
+        if (curFilter === 'archived') return m.Status === 'archived';
+        return true;
+      });
+
+      if (!filtered.length) {
+        const msg = curFilter === 'archived'
+          ? 'No archived materials.'
+          : 'No raw materials yet. Tap + to add the first one.';
+        document.getElementById('rmList').innerHTML = `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">🧺</div>
+            <div class="hs-empty-title">${curFilter === 'archived' ? 'Nothing archived' : 'No materials yet'}</div>
+            <div class="hs-empty-sub">${msg}</div>
+          </div>`;
+        return;
+      }
+
+      document.getElementById('rmList').innerHTML = filtered.map(m => materialCardHTML(m)).join('');
+    }
+
+    /* ── MATERIAL CARD HTML ── */
+    function materialCardHTML(m) {
+      const rmId    = m.RawMaterialId;
+      const unit    = m.Unit || '';
+      const qty     = Number(m.TotalQty || 0);
+      const isLow   = qty <= 0;
+      const isArch  = m.Status === 'archived';
+      const pList   = purchases[rmId] || [];
+      const spend   = pList.reduce((s,p) => s + Number(p.Cost || 0), 0);
+      const isOpen  = expanded[rmId];
+
+      const actions = isArch
+        ? `<button class="rm-action-btn rm-restore-btn" onclick="setStatus('${rmId}','active')" title="Restore">♻️</button>`
+        : `
+          <button class="rm-action-btn rm-purchase-btn" onclick="openAddPurchase('${rmId}')" title="Log Purchase">+💰</button>
+          <button class="rm-action-btn rm-edit-btn"     onclick="openEditMaterial('${rmId}')" title="Edit">✏️</button>
+          <button class="rm-action-btn rm-archive-btn"  onclick="setStatus('${rmId}','archived')" title="Archive">📦</button>`;
+
+      const purchasesHTML = isOpen && pList.length
+        ? `<div class="rm-purchases">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">
+              PURCHASE LOG (${pList.length})
+            </div>
+            ${pList.map(p => purchaseRowHTML(p, unit)).join('')}
+           </div>`
+        : isOpen
+          ? `<div class="rm-purchases" style="color:var(--text-muted);font-size:12.5px;padding:6px 0;">
+               No purchases logged yet.
+             </div>`
+          : '';
+
+      const toggleLabel = isOpen
+        ? `▲ Hide purchases`
+        : `▼ ${pList.length} purchase${pList.length !== 1 ? 's' : ''}`;
+
+      return `
+        <div class="rm-card${isArch ? ' archived' : ''}" id="rm-card-${rmId}">
+          <div class="rm-card-top">
+            <div class="rm-card-meta">
+              <div class="rm-card-name">${m.Name}</div>
+              <span class="unit-badge">${unit}</span>
+              ${isArch ? '<span class="hs-badge" style="margin-left:6px;background:var(--border);color:var(--text-muted);">Archived</span>' : ''}
+              <div style="margin-top:8px;">
+                <div class="rm-card-qty${isLow && !isArch ? ' low' : ''}">${HS.fmt(qty)}</div>
+                <div class="rm-card-qty-label">${unit} remaining</div>
+              </div>
+            </div>
+            <div class="rm-card-right">
+              <div class="rm-card-cost">₹${HS.fmt(spend)} spent</div>
+              <div class="rm-card-actions">${actions}</div>
+            </div>
+          </div>
+          ${!isArch ? `
+            <div style="margin-top:8px;">
+              <button class="hs-btn hs-btn-ghost" style="width:100%;font-size:12px;padding:6px;"
+                onclick="togglePurchases('${rmId}')">
+                ${toggleLabel}
+              </button>
+            </div>` : ''}
+          ${purchasesHTML}
+        </div>`;
+    }
+
+    /* ── PURCHASE ROW HTML ── */
+    function purchaseRowHTML(p, unit) {
+      const date = HS.formatDate(p.PurchasedAt) || p.PurchasedAt || '—';
+      const qty  = HS.fmt(Number(p.Qty || 0));
+      return `
+        <div class="rm-purchase-row">
+          <div class="rm-purchase-date">${date}</div>
+          <div class="rm-purchase-detail">
+            ${qty} ${unit}
+            ${p.Note ? `<div class="rm-purchase-note">${p.Note}</div>` : ''}
+          </div>
+          <div class="rm-purchase-amount">₹${HS.fmt(Number(p.Cost || 0))}</div>
+          <div class="rm-purchase-actions">
+            <button class="rm-purchase-action" style="background:rgba(61,99,56,.12);"
+              onclick="openEditPurchase('${p.PurchaseId}','${p.RawMaterialId}')" title="Edit">✏️</button>
+            <button class="rm-purchase-action" style="background:rgba(184,50,37,.10);"
+              onclick="deletePurchase('${p.PurchaseId}','${p.RawMaterialId}')" title="Delete">🗑️</button>
+          </div>
+        </div>`;
+    }
+
+    /* ── TOGGLE PURCHASE LIST ── */
+    function togglePurchases(rmId) {
+      expanded[rmId] = !expanded[rmId];
+      // Re-render just this card
+      const m = materials.find(m => m.RawMaterialId === rmId);
+      if (m) {
+        const card = document.getElementById('rm-card-' + rmId);
+        if (card) card.outerHTML = materialCardHTML(m);
+      }
+    }
+
+    /* ══ MATERIAL CRUD ══ */
+    function openAddMaterial() {
+      document.getElementById('rmModalTitle').textContent = 'Add Raw Material';
+      document.getElementById('rmId').value   = '';
+      document.getElementById('rmName').value = '';
+      document.getElementById('rmUnit').value = '';
+      HS.openModal('rmModal');
+    }
+
+    function openEditMaterial(rmId) {
+      const m = materials.find(m => m.RawMaterialId === rmId);
+      if (!m) return;
+      document.getElementById('rmModalTitle').textContent = 'Edit Raw Material';
+      document.getElementById('rmId').value   = rmId;
+      document.getElementById('rmName').value = m.Name || '';
+      document.getElementById('rmUnit').value = m.Unit || '';
+      HS.openModal('rmModal');
+    }
+
+    async function saveMaterial() {
+      const rmId = document.getElementById('rmId').value;
+      const name = document.getElementById('rmName').value.trim();
+      const unit = document.getElementById('rmUnit').value;
+
+      if (!name) { HS.toast('Name is required.', 'error'); return; }
+      if (!unit) { HS.toast('Unit is required.', 'error'); return; }
+
+      HS.closeModal('rmModal');
+      HS.loading(true, rmId ? 'Updating…' : 'Saving…');
+      try {
+        const action = rmId ? 'updateRawMaterial' : 'addRawMaterial';
+        const data   = { rawMaterialId: rmId, name, unit };
+        const res    = await HS.api({ action, data: JSON.stringify(data) });
+        if (res.success) {
+          HS.toast(rmId ? '✅ Material updated!' : '✅ Material added!', 'success');
+          await loadAll();
+        } else { HS.toast('Error: ' + (res.error || 'Unknown'), 'error'); }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    async function setStatus(rmId, status) {
+      const m      = materials.find(m => m.RawMaterialId === rmId);
+      const label  = status === 'archived' ? 'archive' : 'restore';
+      HS.confirm(`${label.charAt(0).toUpperCase() + label.slice(1)} "${m?.Name}"?`, async () => {
+        HS.loading(true, status === 'archived' ? 'Archiving…' : 'Restoring…');
+        try {
+          const res = await HS.api({ action: 'setRawMaterialStatus', rawMaterialId: rmId, status });
+          if (res.success) { HS.toast(`✅ ${m?.Name} ${status === 'archived' ? 'archived' : 'restored'}.`, 'success'); await loadAll(); }
+          else HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        } catch(e) { HS.toast('Network error.', 'error'); }
+        finally { HS.loading(false); }
+      });
+    }
+
+    /* ══ PURCHASE CRUD ══ */
+    function openAddPurchase(rmId) {
+      const m = materials.find(m => m.RawMaterialId === rmId);
+      if (!m) return;
+      document.getElementById('purchaseModalTitle').textContent  = 'Log Purchase';
+      document.getElementById('purchaseModalSub').textContent    = m.Name;
+      document.getElementById('purchaseId').value   = '';
+      document.getElementById('purchaseRmId').value = rmId;
+      document.getElementById('purchaseUnit').value = m.Unit || '';
+      document.getElementById('purchaseDate').value  = HS.today();
+      document.getElementById('purchaseQty').value   = '';
+      document.getElementById('purchaseCost').value  = '';
+      document.getElementById('purchaseNote').value  = '';
+      document.getElementById('purchaseQtyLabel').textContent = `Quantity (${m.Unit}) *`;
+      expanded[rmId] = true; // auto-expand after adding
+      HS.openModal('purchaseModal');
+    }
+
+    function openEditPurchase(purchaseId, rmId) {
+      const m = materials.find(m => m.RawMaterialId === rmId);
+      const p = (purchases[rmId] || []).find(p => p.PurchaseId === purchaseId);
+      if (!m || !p) return;
+      document.getElementById('purchaseModalTitle').textContent  = 'Edit Purchase';
+      document.getElementById('purchaseModalSub').textContent    = m.Name;
+      document.getElementById('purchaseId').value    = purchaseId;
+      document.getElementById('purchaseRmId').value  = rmId;
+      document.getElementById('purchaseUnit').value  = m.Unit || '';
+      document.getElementById('purchaseDate').value  = p.PurchasedAt || HS.today();
+      document.getElementById('purchaseQty').value   = p.Qty || '';
+      document.getElementById('purchaseCost').value  = p.Cost || '';
+      document.getElementById('purchaseNote').value  = p.Note || '';
+      document.getElementById('purchaseQtyLabel').textContent = `Quantity (${m.Unit}) *`;
+      HS.openModal('purchaseModal');
+    }
+
+    async function savePurchase() {
+      const purchaseId   = document.getElementById('purchaseId').value;
+      const rmId         = document.getElementById('purchaseRmId').value;
+      const purchasedAt  = document.getElementById('purchaseDate').value;
+      const qtyVal       = document.getElementById('purchaseQty').value.trim();
+      const costVal      = document.getElementById('purchaseCost').value.trim();
+      const note         = document.getElementById('purchaseNote').value.trim();
+
+      if (!purchasedAt) { HS.toast('Date is required.', 'error'); return; }
+      if (!qtyVal)      { HS.toast('Quantity is required.', 'error'); return; }
+      if (!costVal)     { HS.toast('Cost is required.', 'error'); return; }
+      const qty  = Number(qtyVal);
+      const cost = Number(costVal);
+      if (isNaN(qty)  || qty  <= 0) { HS.toast('Enter a valid quantity.', 'error');  return; }
+      if (isNaN(cost) || cost <  0) { HS.toast('Enter a valid cost.', 'error'); return; }
+
+      HS.closeModal('purchaseModal');
+      HS.loading(true, purchaseId ? 'Updating…' : 'Saving…');
+      try {
+        const isEdit = !!purchaseId;
+        const action = isEdit ? 'updateRawPurchase' : 'addRawPurchase';
+        const data   = { purchaseId, rawMaterialId: rmId, qty, cost, purchasedAt, note };
+        const res    = await HS.api({ action, data: JSON.stringify(data) });
+        if (res.success) {
+          HS.toast(isEdit ? '✅ Purchase updated!' : '✅ Purchase logged!', 'success');
+          await loadAll();
+        } else { HS.toast('Error: ' + (res.error || 'Unknown'), 'error'); }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    async function deletePurchase(purchaseId, rmId) {
+      const p = (purchases[rmId] || []).find(p => p.PurchaseId === purchaseId);
+      const m = materials.find(m => m.RawMaterialId === rmId);
+      HS.confirm(
+        `Delete this purchase entry (${HS.fmt(p?.Qty || 0)} ${m?.Unit || ''} · ₹${HS.fmt(p?.Cost || 0)})?\n\nThis will reverse the quantity from the master stock.`,
+        async () => {
+          HS.loading(true, 'Deleting…');
+          try {
+            const res = await HS.api({ action: 'deleteRawPurchase', purchaseId });
+            if (res.success) { HS.toast('Purchase deleted.', 'success'); await loadAll(); }
+            else HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+          } catch(e) { HS.toast('Network error.', 'error'); }
+          finally { HS.loading(false); }
+        }
+      );
+    }
+  </script>
+</body>
+</html>
