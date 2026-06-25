@@ -24,6 +24,16 @@
 ═══════════════════════════════════════ */
 const MELAS_SHEET            = 'Melas';
 const RAW_MATERIALS_SHEET    = 'RawMaterials';
+const RECIPES_SHEET          = 'Recipes';
+const RECIPES_HEADERS        = ['RecipeId','ItemKey','RawMaterialId','QtyPerUnit','CreatedAt'];
+const PREP_LOG_SHEET         = 'PreparationLog';
+const MELA_ALLOC_SHEET       = 'MelaAllocations';
+const SALE_DEDUCTIONS_SHEET  = 'SaleDeductions';
+const SALE_DEDUCTIONS_HEADERS = ['DeductionId','TransactionId','MelaId','ItemKey','QtySold','CostOfGoods','SaleDate','CreatedAt'];
+const MELA_ALLOC_HEADERS     = ['AllocationId','MelaId','ItemKey','QtyAllocated','QtyReturnedToStock','QtyDamaged','QtyKeptAtStall','ReturnNote','AllocatedAt','Status'];
+const PREP_STOCK_SHEET       = 'PreparedStock';
+const PREP_LOG_HEADERS       = ['PrepId','ItemKey','QtyPrepared','PreparedAt','Note','RawMaterialsReturned'];
+const PREP_STOCK_HEADERS     = ['ItemKey','AvailableQty'];
 const RAW_PURCHASES_SHEET    = 'RawMaterialPurchases';
 
 const RAW_MATERIALS_HEADERS  = ['RawMaterialId','Name','Unit','TotalQty','Status','CreatedAt'];
@@ -36,7 +46,7 @@ const EXPENSE_CATEGORIES_SHEET = 'ExpenseCategories';
 const MELAS_HEADERS           = ['MelaId','MelaName','Area','OrganiserName','ContactPerson','ContactPhone','DateFrom','DateTo','Status','CreatedAt'];
 const MENU_ITEMS_HEADERS      = ['ItemKey','ItemName','DefaultPrice','CreatedInMela','CreatedAt','Category'];
 const MELA_MENU_HEADERS       = ['MelaId','ItemKey','SellingPrice','Status','SortOrder','AddedAt'];
-const PURCHASES_HEADERS_NEW   = ['Timestamp','Date','CustomerName','Phone','CustomerType','SocialMedia','Items','TotalAmount','PaymentMode'];
+const PURCHASES_HEADERS_NEW   = ['TransactionId','Timestamp','Date','CustomerName','Phone','CustomerType','SocialMedia','Items','TotalAmount','PaymentMode'];
 const CATEGORIES_HEADERS      = ['CategoryName'];
 const EXPENSE_CATEGORIES_HEADERS = ['CategoryName'];
 const EXPENSE_HEADERS         = ['ExpenseId','Date','Category','Amount','Notes','CreatedAt'];
@@ -205,6 +215,22 @@ function isNewFormatSheet(sheet) {
   return data[0].includes('Items');
 }
 
+/* Ensure the purchases sheet has TransactionId as its first column.
+   Existing new-format sheets (Items present, no TransactionId) get it inserted. */
+function ensureTransactionIdColumn(sheet) {
+  const data = sheet.getDataRange().getValues();
+  if (!data || data.length === 0) return;
+  const hdrs = data[0];
+  if (hdrs[0] === 'TransactionId') return; // already in place
+  if (!hdrs.includes('Items')) return;     // old format — migration handles this separately
+
+  // Insert empty TransactionId column at position 1
+  sheet.insertColumnBefore(1);
+  sheet.getRange(1, 1).setValue('TransactionId');
+  styleHeader(sheet, hdrs.length + 1);
+  // Leave existing data rows with empty TransactionId (legacy rows)
+}
+
 function sheetToObjects(sheet) {
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
@@ -261,6 +287,139 @@ function adjustRawMaterialQty(ss, rawMaterialId, delta) {
   return false;
 }
 
+function getRecipesSheet(ss) {
+  let s = ss.getSheetByName(RECIPES_SHEET);
+  if (!s) {
+    s = ss.insertSheet(RECIPES_SHEET);
+    s.appendRow(RECIPES_HEADERS);
+    styleHeader(s, RECIPES_HEADERS.length);
+  }
+  return s;
+}
+
+function getPrepLogSheet(ss) {
+  let s = ss.getSheetByName(PREP_LOG_SHEET);
+  if (!s) {
+    s = ss.insertSheet(PREP_LOG_SHEET);
+    s.appendRow(PREP_LOG_HEADERS);
+    styleHeader(s, PREP_LOG_HEADERS.length);
+  }
+  return s;
+}
+
+function getPrepStockSheet(ss) {
+  let s = ss.getSheetByName(PREP_STOCK_SHEET);
+  if (!s) {
+    s = ss.insertSheet(PREP_STOCK_SHEET);
+    s.appendRow(PREP_STOCK_HEADERS);
+    styleHeader(s, PREP_STOCK_HEADERS.length);
+  }
+  return s;
+}
+
+function getMelaAllocSheet(ss) {
+  let s = ss.getSheetByName(MELA_ALLOC_SHEET);
+  if (!s) {
+    s = ss.insertSheet(MELA_ALLOC_SHEET);
+    s.appendRow(MELA_ALLOC_HEADERS);
+    styleHeader(s, MELA_ALLOC_HEADERS.length);
+  }
+  return s;
+}
+
+function getSaleDeductionsSheet(ss) {
+  let s = ss.getSheetByName(SALE_DEDUCTIONS_SHEET);
+  if (!s) {
+    s = ss.insertSheet(SALE_DEDUCTIONS_SHEET);
+    s.appendRow(SALE_DEDUCTIONS_HEADERS);
+    styleHeader(s, SALE_DEDUCTIONS_HEADERS.length);
+  }
+  return s;
+}
+
+/* Compute weighted average cost per unit for a raw material
+   based on all purchase history. Returns 0 if no purchases. */
+function weightedAvgCost(ss, rawMaterialId) {
+  const purchases = sheetToObjects(getRawPurchasesSheet(ss))
+    .filter(p => p.RawMaterialId === rawMaterialId);
+  const totalQty  = purchases.reduce((s, p) => s + Number(p.Qty  || 0), 0);
+  const totalCost = purchases.reduce((s, p) => s + Number(p.Cost || 0), 0);
+  return totalQty > 0 ? totalCost / totalQty : 0;
+}
+
+/* Compute cost of goods for one sale line:
+   { itemKey, qtySold } → total ingredient cost */
+function computeCOGS(ss, itemKey, qtySold) {
+  const recipe = getRecipeMap(ss, itemKey);
+  if (!Object.keys(recipe).length) return 0;
+  let cost = 0;
+  Object.entries(recipe).forEach(([rmId, qtyPerUnit]) => {
+    cost += weightedAvgCost(ss, rmId) * qtyPerUnit * qtySold;
+  });
+  return cost;
+}
+
+/* Write SaleDeduction rows for a transaction's items.
+   items: { itemKey: { qty, price } } */
+function writeSaleDeductions(ss, transactionId, melaId, items, saleDate) {
+  const sheet = getSaleDeductionsSheet(ss);
+  const now   = new Date().toISOString();
+  Object.entries(items).forEach(([itemKey, val]) => {
+    const qtySold = Number(val.qty || val || 0);
+    if (qtySold <= 0) return;
+    const cogs = computeCOGS(ss, itemKey, qtySold);
+    sheet.appendRow(['ded_' + Date.now() + '_' + itemKey, transactionId, melaId, itemKey, qtySold, cogs, saleDate||'', now]);
+  });
+  cDel('sale_ded_' + melaId);
+}
+
+/* Delete all SaleDeduction rows for a transactionId */
+function deleteSaleDeductions(ss, transactionId) {
+  const sheet = getSaleDeductionsSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const txCol = hdrs.indexOf('TransactionId');
+  const melaId = null;
+  // Delete from bottom up to preserve row indices
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][txCol] === transactionId) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  // Invalidate all mela deduction caches (we don't know which mela without scanning)
+  cDel('sale_ded_all');
+}
+
+/* Adjust PreparedStock for an ItemKey by delta (+/-).
+   Upserts the row — creates it if it doesn't exist yet. */
+function adjustPreparedStock(ss, itemKey, delta) {
+  const sheet = getPrepStockSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const ikCol = hdrs.indexOf('ItemKey');
+  const qyCol = hdrs.indexOf('AvailableQty');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][ikCol] === itemKey) {
+      const cur = Number(rows[i][qyCol]) || 0;
+      sheet.getRange(i + 1, qyCol + 1).setValue(Math.max(0, cur + delta));
+      cDel('prep_stock');
+      return;
+    }
+  }
+  // Row doesn't exist yet — insert
+  sheet.appendRow([itemKey, Math.max(0, delta)]);
+  cDel('prep_stock');
+}
+
+/* Fetch all recipe lines for an ItemKey as a map { rawMaterialId: qtyPerUnit } */
+function getRecipeMap(ss, itemKey) {
+  const rows  = sheetToObjects(getRecipesSheet(ss));
+  const lines = rows.filter(r => r.ItemKey === itemKey);
+  const map   = {};
+  lines.forEach(r => { map[r.RawMaterialId] = Number(r.QtyPerUnit) || 0; });
+  return map;
+}
+
 /* ═══════════════════════════════════════
    MAIN ROUTER
 ═══════════════════════════════════════ */
@@ -293,6 +452,23 @@ function doGet(e) {
       case 'restoreMelaMenuItem': return handleSetMenuStatus(ss,e,'active');
       case 'reorderMelaMenu':     return handleReorderMelaMenu(ss,e);
       case 'save':                return handleSavePurchase(ss,e);
+      case 'updateTransaction':   return handleUpdateTransaction(ss,e);
+      case 'deleteTransaction':   return handleDeleteTransaction(ss,e);
+      case 'getSaleDeductions':   return handleGetSaleDeductions(ss,e);
+      // ── Mela Allocations ──
+      case 'getMelaAllocations':    return handleGetMelaAllocations(ss,e);
+      case 'addMelaAllocation':     return handleAddMelaAllocation(ss,e);
+      case 'returnMelaAllocation':  return handleReturnMelaAllocation(ss,e);
+      // ── Preparations ──
+      case 'getPreparationLog':     return handleGetPreparationLog(ss,e);
+      case 'getPreparedStock':      return handleGetPreparedStock(ss,e);
+      case 'addPreparation':        return handleAddPreparation(ss,e);
+      case 'updatePreparation':     return handleUpdatePreparation(ss,e);
+      case 'deletePreparation':     return handleDeletePreparation(ss,e);
+      // ── Recipes ──
+      case 'getRecipes':            return handleGetRecipes(ss,e);
+      case 'saveRecipe':            return handleSaveRecipe(ss,e);
+      case 'deleteRecipeLine':      return handleDeleteRecipeLine(ss,e);
       // ── Raw Materials ──
       case 'getRawMaterials':       return handleGetRawMaterials(ss,e);
       case 'addRawMaterial':        return handleAddRawMaterial(ss,e);
@@ -596,12 +772,13 @@ function migrateToNewFormat(sheet) {
     ];
   });
 
-  // Rewrite the sheet with new headers
+  // Rewrite the sheet with new headers (TransactionId prepended as empty for legacy rows)
+  const migratedRows = newRows.map(r => ['', ...r]); // prepend empty TransactionId
   sheet.clearContents();
   sheet.appendRow(PURCHASES_HEADERS_NEW);
   styleHeader(sheet, PURCHASES_HEADERS_NEW.length);
-  if (newRows.length > 0)
-    sheet.getRange(2, 1, newRows.length, PURCHASES_HEADERS_NEW.length).setValues(newRows);
+  if (migratedRows.length > 0)
+    sheet.getRange(2, 1, migratedRows.length, PURCHASES_HEADERS_NEW.length).setValues(migratedRows);
 }
 
 /* ═══════════════════════════════════════
@@ -612,6 +789,10 @@ function handleSavePurchase(ss,e) {
   if(!melaId) return ok({success:false,error:'melaId required'});
   const d=JSON.parse(e.parameter.data);
   const sheet=getPurchasesSheet(ss,melaId);
+  ensureTransactionIdColumn(sheet); // self-heal: add TransactionId column if missing
+
+  // Generate a unique TransactionId for new sales
+  const transactionId = d.transactionId || ('tx_' + Date.now());
 
   // If old-format sheet has new item keys not in OLD_COL_TO_KEY → auto-migrate
   let useNew = isNewFormatSheet(sheet);
@@ -623,24 +804,29 @@ function handleSavePurchase(ss,e) {
 
   if (useNew) {
     sheet.appendRow([
-      d.timestamp, d.date, d.customerName||'', d.phone||'',
+      transactionId, d.timestamp, d.date, d.customerName||'', d.phone||'',
       d.customerType, d.socialMedia||'',
       JSON.stringify(d.items), d.totalAmount, d.paymentMode,
     ]);
   } else {
     const getQty=val=>(val&&typeof val==='object')?(val.qty||0):(Number(val)||0);
-    const row=[d.timestamp,d.date,d.customerName||'',d.phone||'',d.customerType,d.socialMedia||''];
+    const row=[transactionId,d.timestamp,d.date,d.customerName||'',d.phone||'',d.customerType,d.socialMedia||''];
     Object.entries(OLD_COL_TO_KEY).forEach(([col,key])=>row.push(getQty(d.items[key])));
     row.push(d.totalAmount,d.paymentMode);
     sheet.appendRow(row);
   }
-  return ok({success:true});
+
+  // Write sale deductions (COGS per item sold)
+  writeSaleDeductions(ss, transactionId, melaId, d.items, d.date);
+
+  return ok({success:true, transactionId});
 }
 
 function handleGetData(ss,e) {
   const melaId=e.parameter.melaId;
   if(!melaId) return ok({data:[],error:'melaId required'});
   const sheet=getPurchasesSheet(ss,melaId);
+  ensureTransactionIdColumn(sheet); // self-heal: add TransactionId column if missing
   const raw=sheet.getDataRange().getValues();
   if(raw.length<2) return ok({data:[],isNewFormat:isNewFormatSheet(sheet)});
   const hdrs=raw[0], tz=Session.getScriptTimeZone();
@@ -664,6 +850,486 @@ function handleUpdatePaymentMode(ss,e) {
   if(!pmCol) return ok({success:false,error:'PaymentMode column not found'});
   sheet.getRange(rowIndex,pmCol).setValue(newMode);
   return ok({success:true});
+}
+
+/* ═══════════════════════════════════════
+   TRANSACTION EDIT / DELETE HANDLERS
+═══════════════════════════════════════ */
+
+/* Update a transaction row in full.
+   Identifies the row by TransactionId (new rows) or rowIndex (legacy rows).
+   Reverses old deductions, writes new ones. */
+function handleUpdateTransaction(ss, e) {
+  const melaId = e.parameter.melaId;
+  const d      = JSON.parse(e.parameter.data);
+  if (!melaId) return ok({ success: false, error: 'melaId required' });
+
+  const sheet = getPurchasesSheet(ss, melaId);
+  ensureTransactionIdColumn(sheet); // self-heal
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+
+  const txIdCol  = hdrs.indexOf('TransactionId');
+  const riCol    = hdrs.indexOf('_rowIndex'); // doesn't exist in sheet — use sheet row
+
+  // Find the row: by TransactionId if present, else by rowIndex (1-based sheet row)
+  let targetRow = -1;
+  if (d.transactionId && txIdCol >= 0) {
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][txIdCol] === d.transactionId) { targetRow = i + 1; break; }
+    }
+  }
+  // Fall back to rowIndex (legacy rows without TransactionId)
+  if (targetRow < 0 && d.rowIndex) {
+    targetRow = Number(d.rowIndex);
+  }
+  if (targetRow < 0) return ok({ success: false, error: 'Transaction not found' });
+
+  // Determine old TransactionId for deduction reversal
+  const oldTxId = txIdCol >= 0 ? rows[targetRow - 1][txIdCol] : null;
+
+  // Build the new row values
+  const transactionId = oldTxId || d.transactionId || ('tx_' + Date.now());
+  const set = (col, val) => {
+    const c = hdrs.indexOf(col);
+    if (c >= 0) sheet.getRange(targetRow, c + 1).setValue(val);
+  };
+
+  if (txIdCol >= 0) set('TransactionId', transactionId);
+  set('Timestamp',    d.timestamp    || new Date().toISOString());
+  set('Date',         d.date         || '');
+  set('CustomerName', d.customerName || '');
+  set('Phone',        d.phone        || '');
+  set('CustomerType', d.customerType || 'normal');
+  set('SocialMedia',  d.socialMedia  || '');
+  set('Items',        JSON.stringify(d.items));
+  set('TotalAmount',  d.totalAmount  || 0);
+  set('PaymentMode',  d.paymentMode  || 'cash');
+
+  // Reverse old deductions, write new ones
+  if (oldTxId) deleteSaleDeductions(ss, oldTxId);
+  writeSaleDeductions(ss, transactionId, melaId, d.items, d.date);
+
+  cDel('sale_ded_' + melaId);
+  return ok({ success: true, transactionId });
+}
+
+/* Delete a transaction row.
+   Identifies by TransactionId or rowIndex. Reverses deductions. */
+function handleDeleteTransaction(ss, e) {
+  const melaId = e.parameter.melaId;
+  if (!melaId) return ok({ success: false, error: 'melaId required' });
+
+  const sheet = getPurchasesSheet(ss, melaId);
+  ensureTransactionIdColumn(sheet); // self-heal
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const txIdCol = hdrs.indexOf('TransactionId');
+
+  let targetRow = -1;
+  let oldTxId   = null;
+
+  if (e.parameter.transactionId && txIdCol >= 0) {
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][txIdCol] === e.parameter.transactionId) {
+        targetRow = i + 1;
+        oldTxId   = rows[i][txIdCol];
+        break;
+      }
+    }
+  }
+  if (targetRow < 0 && e.parameter.rowIndex) {
+    targetRow = Number(e.parameter.rowIndex);
+    if (txIdCol >= 0) oldTxId = rows[targetRow - 1]?.[txIdCol] || null;
+  }
+  if (targetRow < 0) return ok({ success: false, error: 'Transaction not found' });
+
+  // Reverse deductions before deleting
+  if (oldTxId) deleteSaleDeductions(ss, oldTxId);
+
+  sheet.deleteRow(targetRow);
+  cDel('sale_ded_' + melaId);
+  return ok({ success: true });
+}
+
+/* Get all sale deductions for a mela */
+function handleGetSaleDeductions(ss, e) {
+  const melaId = e.parameter.melaId;
+  if (!melaId) return ok({ data: [], error: 'melaId required' });
+  const cKey = 'sale_ded_' + melaId;
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  const data = sheetToObjects(getSaleDeductionsSheet(ss)).filter(r => r.MelaId === melaId);
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+/* ═══════════════════════════════════════
+   MELA ALLOCATION HANDLERS
+═══════════════════════════════════════ */
+
+function handleGetMelaAllocations(ss, e) {
+  const melaId = e.parameter.melaId;
+  if (!melaId) return ok({ data: [], error: 'melaId required' });
+  const cKey = 'mela_alloc_' + melaId;
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  const data = sheetToObjects(getMelaAllocSheet(ss)).filter(r => r.MelaId === melaId);
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+/* Take items from PreparedStock to a mela.
+   d: { melaId, itemKey, qty, note, allocatedAt } */
+function handleAddMelaAllocation(ss, e) {
+  const d   = JSON.parse(e.parameter.data);
+  const qty = Number(d.qty) || 0;
+  if (qty <= 0) return ok({ success: false, error: 'Qty must be greater than 0' });
+
+  // Check PreparedStock availability
+  const stockRows = sheetToObjects(getPrepStockSheet(ss));
+  const stockRow  = stockRows.find(r => r.ItemKey === d.itemKey);
+  const available = Number(stockRow?.AvailableQty || 0);
+  if (qty > available) {
+    return ok({
+      success: false,
+      error: 'Insufficient prepared stock',
+      available,
+    });
+  }
+
+  // Deduct from PreparedStock
+  adjustPreparedStock(ss, d.itemKey, -qty);
+
+  // Create allocation row
+  const allocId = 'alloc_' + Date.now();
+  const now     = new Date().toISOString();
+  getMelaAllocSheet(ss).appendRow([
+    allocId, d.melaId, d.itemKey,
+    qty,   // QtyAllocated
+    0,     // QtyReturnedToStock
+    0,     // QtyDamaged
+    0,     // QtyKeptAtStall
+    d.note || '',
+    d.allocatedAt || now,
+    'active',
+  ]);
+
+  cDel('mela_alloc_' + d.melaId, 'prep_stock');
+  return ok({ success: true, allocId });
+}
+
+/* Return items from a mela allocation.
+   d: { allocId, melaId, qtyReturnedToStock, qtyDamaged, returnNote }
+   (qtyKeptAtStall always defaults to 0 — implicit, not sent from client)
+   The three qtys must add up to <= QtyAllocated - already-returned/damaged/kept.
+*/
+function handleReturnMelaAllocation(ss, e) {
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getMelaAllocSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+
+  const col = h => hdrs.indexOf(h);
+  const idCol    = col('AllocationId');
+  const ikCol    = col('ItemKey');
+  const qaCol    = col('QtyAllocated');
+  const qrCol    = col('QtyReturnedToStock');
+  const qdCol    = col('QtyDamaged');
+  const qkCol    = col('QtyKeptAtStall');
+  const rnCol    = col('ReturnNote');
+  const stCol    = col('Status');
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] !== d.allocId) continue;
+
+    const itemKey      = rows[i][ikCol];
+    const qtyAllocated = Number(rows[i][qaCol]) || 0;
+    const qtyRetPrev   = Number(rows[i][qrCol]) || 0;
+    const qtyDmgPrev   = Number(rows[i][qdCol]) || 0;
+    const qtyKptPrev   = Number(rows[i][qkCol]) || 0;
+
+    const alreadyDisposed = qtyRetPrev + qtyDmgPrev + qtyKptPrev;
+    const stillAtStall    = qtyAllocated - alreadyDisposed;
+
+    const newRet = Number(d.qtyReturnedToStock || 0);
+    const newDmg = Number(d.qtyDamaged         || 0);
+    const newKpt = Number(d.qtyKeptAtStall      || 0);
+    const total  = newRet + newDmg + newKpt;
+
+    if (total <= 0)             return ok({ success: false, error: 'Enter at least one non-zero quantity' });
+    if (total > stillAtStall)   return ok({ success: false, error: `Only ${stillAtStall} units still at stall`, stillAtStall });
+
+    // Update the row (accumulate onto existing values)
+    const r = i + 1;
+    sheet.getRange(r, qrCol + 1).setValue(qtyRetPrev + newRet);
+    sheet.getRange(r, qdCol + 1).setValue(qtyDmgPrev + newDmg);
+    sheet.getRange(r, qkCol + 1).setValue(qtyKptPrev + newKpt);
+    if (d.returnNote) sheet.getRange(r, rnCol + 1).setValue(d.returnNote);
+
+    // Mark fully disposed allocations as 'returned'
+    const totalDisposed = alreadyDisposed + total;
+    if (totalDisposed >= qtyAllocated) {
+      sheet.getRange(r, stCol + 1).setValue('returned');
+    }
+
+    // Restore returned qty to PreparedStock
+    if (newRet > 0) adjustPreparedStock(ss, itemKey, newRet);
+
+    cDel('mela_alloc_' + d.melaId, 'prep_stock');
+    return ok({ success: true, stillAtStall: stillAtStall - total });
+  }
+  return ok({ success: false, error: 'Allocation not found' });
+}
+
+/* ═══════════════════════════════════════
+   PREPARATION HANDLERS
+═══════════════════════════════════════ */
+
+function handleGetPreparationLog(ss, e) {
+  const itemKey = e.parameter.itemKey || null;
+  const cKey    = itemKey ? 'prep_log_' + itemKey : 'prep_log_all';
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  let data = sheetToObjects(getPrepLogSheet(ss));
+  if (itemKey) data = data.filter(r => r.ItemKey === itemKey);
+  // Sort newest first
+  data.sort((a, b) => (b.PreparedAt || '').localeCompare(a.PreparedAt || ''));
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+function handleGetPreparedStock(ss, e) {
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet('prep_stock');
+    if (hit) return ok({ data: hit });
+  }
+  const data = sheetToObjects(getPrepStockSheet(ss));
+  cPut('prep_stock', data);
+  return ok({ data });
+}
+
+function handleAddPreparation(ss, e) {
+  const d      = JSON.parse(e.parameter.data);
+  const prepId = 'prep_' + Date.now();
+  const now    = new Date().toISOString();
+  const qty    = Number(d.qty) || 0;
+  if (qty <= 0) return ok({ success: false, error: 'Qty must be greater than 0' });
+
+  // 1. Fetch recipe — must have at least one ingredient to deduct
+  const recipe = getRecipeMap(ss, d.itemKey);
+  const hasRecipe = Object.keys(recipe).length > 0;
+
+  // 2. Check sufficient raw material stock
+  if (hasRecipe) {
+    const rmSheet = getRawMaterialsSheet(ss);
+    const rmRows  = sheetToObjects(rmSheet);
+    const rmMap   = {};
+    rmRows.forEach(r => { rmMap[r.RawMaterialId] = Number(r.TotalQty) || 0; });
+    const shortfalls = [];
+    Object.entries(recipe).forEach(([rmId, qtyPer]) => {
+      const needed  = qtyPer * qty;
+      const have    = rmMap[rmId] || 0;
+      if (needed > have) {
+        shortfalls.push({ rmId, needed, have });
+      }
+    });
+    if (shortfalls.length > 0) {
+      // Return shortfall info so the client can show a clear error
+      return ok({
+        success: false,
+        error: 'Insufficient raw materials',
+        shortfalls,
+      });
+    }
+    // 3. Deduct raw materials
+    Object.entries(recipe).forEach(([rmId, qtyPer]) => {
+      adjustRawMaterialQty(ss, rmId, -(qtyPer * qty));
+    });
+  }
+
+  // 4. Add to PreparedStock
+  adjustPreparedStock(ss, d.itemKey, qty);
+
+  // 5. Log the preparation
+  getPrepLogSheet(ss).appendRow([
+    prepId, d.itemKey, qty, d.preparedAt || now, d.note || '', 'false'
+  ]);
+
+  cDel('prep_log_all', 'prep_log_' + d.itemKey, 'raw_materials', 'prep_stock');
+  return ok({ success: true, prepId, hasRecipe });
+}
+
+function handleUpdatePreparation(ss, e) {
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getPrepLogSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol  = hdrs.indexOf('PrepId');
+  const ikCol  = hdrs.indexOf('ItemKey');
+  const qtyCol = hdrs.indexOf('QtyPrepared');
+  const atCol  = hdrs.indexOf('PreparedAt');
+  const ntCol  = hdrs.indexOf('Note');
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] !== d.prepId) continue;
+
+    const itemKey = rows[i][ikCol];
+    const oldQty  = Number(rows[i][qtyCol]) || 0;
+    const newQty  = Number(d.qty) || 0;
+    if (newQty <= 0) return ok({ success: false, error: 'Qty must be greater than 0' });
+    const delta = newQty - oldQty;
+
+    const recipe    = getRecipeMap(ss, itemKey);
+    const hasRecipe = Object.keys(recipe).length > 0;
+
+    if (hasRecipe && delta !== 0) {
+      if (delta > 0) {
+        // Need more raw materials — check stock for the additional qty
+        const rmRows = sheetToObjects(getRawMaterialsSheet(ss));
+        const rmMap  = {};
+        rmRows.forEach(r => { rmMap[r.RawMaterialId] = Number(r.TotalQty) || 0; });
+        const shortfalls = [];
+        Object.entries(recipe).forEach(([rmId, qtyPer]) => {
+          const needed = qtyPer * delta;
+          const have   = rmMap[rmId] || 0;
+          if (needed > have) shortfalls.push({ rmId, needed, have });
+        });
+        if (shortfalls.length > 0) return ok({ success: false, error: 'Insufficient raw materials', shortfalls });
+      }
+      // Apply delta to raw materials (positive delta = more consumed, negative = returned)
+      Object.entries(recipe).forEach(([rmId, qtyPer]) => {
+        adjustRawMaterialQty(ss, rmId, -(qtyPer * delta));
+      });
+    }
+
+    // Update PreparedStock
+    if (delta !== 0) adjustPreparedStock(ss, itemKey, delta);
+
+    // Update the log row
+    sheet.getRange(i + 1, qtyCol + 1).setValue(newQty);
+    if (d.preparedAt) sheet.getRange(i + 1, atCol + 1).setValue(d.preparedAt);
+    if (d.note !== undefined) sheet.getRange(i + 1, ntCol + 1).setValue(d.note || '');
+
+    cDel('prep_log_all', 'prep_log_' + itemKey, 'raw_materials', 'prep_stock');
+    return ok({ success: true });
+  }
+  return ok({ success: false, error: 'Preparation not found' });
+}
+
+function handleDeletePreparation(ss, e) {
+  const sheet = getPrepLogSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol  = hdrs.indexOf('PrepId');
+  const ikCol  = hdrs.indexOf('ItemKey');
+  const qtyCol = hdrs.indexOf('QtyPrepared');
+
+  // restoreRawMaterials: 'true' = put raw materials back, 'false' = keep deducted (spoilt)
+  const restore = e.parameter.restoreRawMaterials === 'true';
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] !== e.parameter.prepId) continue;
+
+    const itemKey = rows[i][ikCol];
+    const qty     = Number(rows[i][qtyCol]) || 0;
+
+    // Always remove from PreparedStock
+    adjustPreparedStock(ss, itemKey, -qty);
+
+    // Conditionally restore raw materials
+    if (restore) {
+      const recipe = getRecipeMap(ss, itemKey);
+      Object.entries(recipe).forEach(([rmId, qtyPer]) => {
+        adjustRawMaterialQty(ss, rmId, qtyPer * qty);
+      });
+    }
+
+    sheet.deleteRow(i + 1);
+    cDel('prep_log_all', 'prep_log_' + itemKey, 'raw_materials', 'prep_stock');
+    return ok({ success: true });
+  }
+  return ok({ success: false, error: 'Preparation not found' });
+}
+
+/* ═══════════════════════════════════════
+   RECIPE HANDLERS
+═══════════════════════════════════════ */
+
+/* Returns all recipe lines, optionally filtered by ItemKey */
+function handleGetRecipes(ss, e) {
+  const itemKey = e.parameter.itemKey || null;
+  const cKey    = itemKey ? 'recipes_' + itemKey : 'recipes_all';
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  let data = sheetToObjects(getRecipesSheet(ss));
+  if (itemKey) data = data.filter(r => r.ItemKey === itemKey);
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+/* Upsert a single recipe line (one raw material entry for an ItemKey).
+   If RecipeId is provided → update qty. If not → insert new line.
+   Enforces: same ItemKey+RawMaterialId combo cannot appear twice. */
+function handleSaveRecipe(ss, e) {
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getRecipesSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol  = hdrs.indexOf('RecipeId');
+  const ikCol  = hdrs.indexOf('ItemKey');
+  const rmCol  = hdrs.indexOf('RawMaterialId');
+  const qtyCol = hdrs.indexOf('QtyPerUnit');
+  const now    = new Date().toISOString();
+
+  if (d.recipeId) {
+    // Update existing line
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][idCol] === d.recipeId) {
+        sheet.getRange(i + 1, qtyCol + 1).setValue(Number(d.qtyPerUnit));
+        cDel('recipes_' + d.itemKey, 'recipes_all');
+        return ok({ success: true });
+      }
+    }
+    return ok({ success: false, error: 'Recipe line not found' });
+  } else {
+    // Check duplicate
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][ikCol] === d.itemKey && rows[i][rmCol] === d.rawMaterialId) {
+        return ok({ success: false, error: 'This raw material is already in the recipe. Edit the existing line instead.' });
+      }
+    }
+    const recipeId = 'rc_' + Date.now();
+    sheet.appendRow([recipeId, d.itemKey, d.rawMaterialId, Number(d.qtyPerUnit), now]);
+    cDel('recipes_' + d.itemKey, 'recipes_all');
+    return ok({ success: true, recipeId });
+  }
+}
+
+/* Delete a single recipe line by RecipeId */
+function handleDeleteRecipeLine(ss, e) {
+  const sheet = getRecipesSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol = hdrs.indexOf('RecipeId');
+  const ikCol = hdrs.indexOf('ItemKey');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === e.parameter.recipeId) {
+      const itemKey = rows[i][ikCol];
+      sheet.deleteRow(i + 1);
+      cDel('recipes_' + itemKey, 'recipes_all');
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Recipe line not found' });
 }
 
 /* ═══════════════════════════════════════

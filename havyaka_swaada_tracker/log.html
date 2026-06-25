@@ -259,6 +259,7 @@
       });
 
       const data = {
+        transactionId: 'tx_' + Date.now(),
         timestamp:    new Date().toISOString(),
         date:         document.getElementById('purchaseDate').value,
         customerName: document.getElementById('custName')?.value.trim()    || '',

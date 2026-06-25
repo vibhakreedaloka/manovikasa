@@ -196,8 +196,14 @@ const HS = (() => {
   function normDate(d) {
     if (!d) return '';
     const s = String(d).trim();
+    // Already YYYY-MM-DD — return as-is
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    const dt = new Date(s);
+    // ISO timestamp (e.g. 2026-06-25T18:30:00.000Z) — extract date portion directly
+    // without using new Date() to avoid timezone shifts
+    const isoMatch = s.match(/^(\d{4}-\d{2}-\d{2})T/);
+    if (isoMatch) return isoMatch[1];
+    // Fallback: try parsing but anchor to local midnight to avoid UTC offset issues
+    const dt = new Date(s.includes('T') ? s : s + 'T00:00:00');
     if (isNaN(dt.getTime())) return s;
     return [
       dt.getFullYear(),

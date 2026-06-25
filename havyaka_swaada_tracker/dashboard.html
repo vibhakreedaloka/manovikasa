@@ -38,6 +38,7 @@
       <div class="hs-stat-grid">
         <div class="hs-stat-box s-green" onclick="HS.navigate('transactions.html')" style="cursor:pointer;" title="View transactions"><div class="hs-stat-num" id="sTotal">₹0</div>   <div class="hs-stat-lbl">Revenue ↗</div></div>
         <div class="hs-stat-box s-red" onclick="HS.navigate('expenses.html')" style="cursor:pointer;" title="View expenses"><div class="hs-stat-num" id="sExpenses">₹0</div><div class="hs-stat-lbl">Expenses ↗</div></div>
+        <div class="hs-stat-box s-red"><div class="hs-stat-num" id="sCOGS">₹0</div><div class="hs-stat-lbl">Cost of Goods</div></div>
         <div class="hs-stat-box" id="sPLBox" style="grid-column:1/-1;">
           <div class="hs-stat-num" id="sPL">₹0</div><div class="hs-stat-lbl" id="sPLLbl">Net P&amp;L</div>
         </div>
@@ -139,14 +140,17 @@
 
     /* ═══ TAB 1 — THIS MELA ═══ */
     let melaExpenses = 0; // total expenses for current mela
+    let melaCOGS     = 0; // cost of goods sold for current mela (full mela, unfiltered)
+    let melaDeductions = []; // raw SaleDeductions rows for day-level filtering
 
     async function loadMelaData() {
       HS.loading(true, 'Loading data…');
       try {
-        const [menuRes, dataRes, expRes] = await Promise.all([
-          HS.api({ action: 'getMelaMenu', melaId: mela.MelaId }),
-          HS.api({ action: 'getData',     melaId: mela.MelaId }),
-          HS.api({ action: 'getExpenses', melaId: mela.MelaId }),
+        const [menuRes, dataRes, expRes, dedRes] = await Promise.all([
+          HS.api({ action: 'getMelaMenu',        melaId: mela.MelaId }),
+          HS.api({ action: 'getData',            melaId: mela.MelaId }),
+          HS.api({ action: 'getExpenses',        melaId: mela.MelaId }),
+          HS.api({ action: 'getSaleDeductions',  melaId: mela.MelaId }),
         ]);
         melaMenu = menuRes.data || [];
         itemMap  = {};
@@ -159,6 +163,8 @@
 
         melaRows     = (dataRes.data || []).map(r => normalizeRow({ ...r, Date: HS.normDate(r.Date) }));
         melaExpenses = (expRes.data || []).reduce((s, e) => s + Number(e.Amount || 0), 0);
+        melaDeductions = dedRes.data || [];
+        melaCOGS       = melaDeductions.reduce((s, d) => s + Number(d.CostOfGoods || 0), 0);
         selDay       = 'all';
         buildDayChips();
         renderMelaDash();
@@ -198,13 +204,33 @@
       const infRev    = infRows.filter(r=>r.PaymentMode==='cash'||r.PaymentMode==='online')
                                .reduce((s,r)=>s+Number(r.TotalAmount||0),0);
 
-      // Expenses are for the full mela (not day-filtered) — expenses are a fixed mela cost
+      // Expenses: fixed mela costs (always full mela — not day-filterable)
       const expenses = melaExpenses;
-      const pl       = revenue - expenses;
+
+      // COGS: filter to match the current day selection.
+      // Strategy: use SaleDate if populated (new rows), else fall back to
+      // TransactionId cross-reference against filtered rows (legacy rows).
+      let cogs;
+      if (selDay === 'all') {
+        cogs = melaCOGS;
+      } else {
+        // Build a set of TransactionIds present in the filtered rows (for legacy fallback)
+        const filteredTxIds = new Set(rows.map(r => r.TransactionId).filter(Boolean));
+        cogs = melaDeductions.reduce((s, d) => {
+          const saleDate = HS.normDate(d.SaleDate || '');
+          const matched  = saleDate
+            ? saleDate === selDay                          // new rows: match by SaleDate
+            : filteredTxIds.has(d.TransactionId);         // legacy rows: match by TxId
+          return matched ? s + Number(d.CostOfGoods || 0) : s;
+        }, 0);
+      }
+
+      const pl = revenue - expenses - cogs;
       const isProfit = pl >= 0;
 
       document.getElementById('sTotal').textContent    = '₹'+HS.fmt(revenue);
       document.getElementById('sExpenses').textContent = '₹'+HS.fmt(expenses);
+      document.getElementById('sCOGS').textContent     = '₹'+HS.fmt(cogs);
 
       const plBox = document.getElementById('sPLBox');
       plBox.className = 'hs-stat-box ' + (isProfit ? 's-green' : 's-red');
@@ -484,6 +510,7 @@
         }
       });
     }
+
 
   </script>
 </body>

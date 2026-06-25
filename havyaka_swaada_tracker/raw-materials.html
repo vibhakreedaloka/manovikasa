@@ -169,13 +169,100 @@
       margin: 16px 0 8px;
       padding-left: 2px;
     }
+
+    /* ── Preparation cards ── */
+    .prep-summary {
+      background: linear-gradient(135deg, var(--green) 0%, #2d5a28 100%);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      color: #fff;
+      display: flex;
+      gap: 0;
+    }
+    .prep-summary-cell { flex: 1; text-align: center; }
+    .prep-summary-cell + .prep-summary-cell { border-left: 1px solid rgba(255,255,255,.2); }
+    .prep-summary-val { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; }
+    .prep-summary-lbl { font-size: 11px; opacity: .75; margin-top: 2px; }
+
+    .prep-stock-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .prep-stock-card {
+      background: var(--cream-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      text-align: center;
+    }
+    .prep-stock-card.zero { border-color: var(--red); background: rgba(184,50,37,.05); }
+    .prep-stock-name { font-size: 12px; font-weight: 700; color: var(--brown-mid); margin-bottom: 6px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prep-stock-qty  { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--green); }
+    .prep-stock-qty.zero { color: var(--red); }
+    .prep-stock-lbl  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .prep-card {
+      background: var(--cream-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 13px 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-sm);
+    }
+    .prep-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .prep-card-meta { flex: 1; min-width: 0; }
+    .prep-card-name { font-family: 'Playfair Display', serif; font-size: 15px;
+      font-weight: 700; color: var(--brown); margin-bottom: 3px; }
+    .prep-card-date { font-size: 11.5px; color: var(--text-muted); font-weight: 600; }
+    .prep-card-note { font-size: 12px; color: var(--brown-mid); margin-top: 4px; }
+    .prep-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+    .prep-card-qty  { font-family: 'Playfair Display', serif; font-size: 22px;
+      font-weight: 700; color: var(--green); line-height: 1; }
+    .prep-card-qty-lbl { font-size: 11px; color: var(--text-muted); }
+    .prep-card-actions { display: flex; gap: 6px; }
+    .prep-action-btn {
+      width: 32px; height: 32px; border-radius: 8px; border: none;
+      font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .prep-action-btn:active { filter: brightness(.85); }
+
+    /* Shortfall warning */
+    .shortfall-box {
+      background: rgba(184,50,37,.07);
+      border: 1px solid rgba(184,50,37,.25);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      color: var(--red);
+      margin-top: 10px;
+    }
+    .shortfall-box ul { margin: 6px 0 0 16px; }
+    .shortfall-box li { margin-bottom: 3px; }
   </style>
 </head>
 <body>
 
   <header class="hs-header" id="hs-header"></header>
 
+  <div class="hs-top-tabs" id="rmTabBar">
+    <button class="hs-tab active" onclick="switchRmTab('materials', this)">🧺 Materials</button>
+    <button class="hs-tab"       onclick="switchRmTab('preparations', this)">🍳 Preparations</button>
+  </div>
+
   <main class="hs-page">
+
+    <!-- TAB: MATERIALS -->
+    <div id="rmPanel-materials">
 
     <!-- Summary bar -->
     <div class="rm-summary" id="rmSummary" style="display:none;">
@@ -204,10 +291,22 @@
       </div>
     </div>
 
+    </div><!-- /rmPanel-materials -->
+
+    <!-- TAB: PREPARATIONS -->
+    <div id="rmPanel-preparations" style="display:none;">
+      <div id="prepContent">
+        <div class="hs-empty">
+          <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+          <div class="hs-empty-sub">Loading preparations…</div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- FAB: Add Raw Material -->
-  <button class="hs-fab" onclick="openAddMaterial()" aria-label="Add Raw Material"
+  <button class="hs-fab" id="rmFab" onclick="openAddMaterial()" aria-label="Add Raw Material"
     style="bottom:24px;">+</button>
 
   <!-- ══ ADD / EDIT RAW MATERIAL MODAL ══ -->
@@ -288,6 +387,83 @@
     </div>
   </div>
 
+  <!-- ══ ADD / EDIT PREPARATION MODAL ══ -->
+  <div class="hs-modal-bg" id="prepModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="prepModalTitle">Log Preparation</div>
+
+      <input type="hidden" id="prepId" />
+
+      <div class="hs-field">
+        <label class="hs-label">Menu Item *</label>
+        <select class="hs-input" id="prepItemKey" onchange="onPrepItemChange()">
+          <option value="">-- Select item --</option>
+        </select>
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Date *</label>
+        <input class="hs-input" type="date" id="prepDate" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Quantity Prepared *</label>
+        <input class="hs-input" type="number" id="prepQty" min="1" step="1"
+               placeholder="e.g. 70" oninput="updateIngredientPreview()" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Note <span class="hs-opt">optional</span></label>
+        <input class="hs-input" type="text" id="prepNote"
+               placeholder="Batch info, occasion…" autocomplete="off" />
+      </div>
+
+      <!-- Ingredient deduction preview -->
+      <div id="prepPreview" style="display:none;">
+        <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">
+          RAW MATERIALS TO BE DEDUCTED
+        </div>
+        <div id="prepPreviewLines"></div>
+        <div id="prepShortfall" class="shortfall-box" style="display:none;">
+          <strong>⚠️ Insufficient stock:</strong>
+          <ul id="prepShortfallList"></ul>
+        </div>
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" id="prepSaveBtn" onclick="savePreparation()">
+          🍳 Log Preparation
+        </button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('prepModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ DELETE PREPARATION MODAL ══ -->
+  <div class="hs-modal-bg" id="prepDeleteModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title">Delete Preparation</div>
+      <div id="prepDeleteDesc" style="font-size:13px;color:var(--brown-mid);margin-bottom:16px;line-height:1.6;"></div>
+      <input type="hidden" id="prepDeleteId" />
+
+      <div style="font-size:13.5px;font-weight:700;color:var(--brown);margin-bottom:10px;">
+        What should happen to the raw materials used?
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="hs-btn hs-btn-secondary hs-btn-full" onclick="confirmDeletePrep(true)">
+          ♻️ Return raw materials to stock
+        </button>
+        <button class="hs-btn hs-btn-full" style="background:rgba(184,50,37,.1);color:var(--red);" onclick="confirmDeletePrep(false)">
+          🗑️ Keep deducted — materials are spoilt/lost
+        </button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('prepDeleteModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="assets/common.js"></script>
   <script>
     /* ── State ── */
@@ -314,6 +490,11 @@
     /* ── INIT ── */
     document.addEventListener('DOMContentLoaded', async () => {
       HS.renderHeader({ title: 'Raw Materials', showBack: true });
+      // Auto-switch to preparations tab if URL hash says so
+      if (window.location.hash === '#preparations') {
+        const prepTabBtn = document.querySelector('.hs-tab:last-child');
+        if (prepTabBtn) switchRmTab('preparations', prepTabBtn);
+      }
       await loadAll();
     });
 
@@ -617,6 +798,357 @@
           finally { HS.loading(false); }
         }
       );
+    }
+
+    /* ══════════════════════════════════════
+       TAB SWITCHING
+    ══════════════════════════════════════ */
+    let curRmTab = 'materials';
+
+    function switchRmTab(tab, el) {
+      curRmTab = tab;
+      document.querySelectorAll('.hs-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('rmPanel-materials').style.display    = tab === 'materials'    ? '' : 'none';
+      document.getElementById('rmPanel-preparations').style.display = tab === 'preparations' ? '' : 'none';
+      // Show/hide FAB — only show on materials tab
+      document.getElementById('rmFab').style.display = tab === 'materials' ? '' : 'none';
+      if (tab === 'preparations' && !prepLoaded) loadPreparations();
+    }
+
+    /* ══════════════════════════════════════
+       PREPARATION STATE
+    ══════════════════════════════════════ */
+    let prepLog      = [];     // all preparation log entries
+    let prepStock    = {};     // { itemKey: availableQty }
+    let allMenuItems = [];     // global menu item library
+    let allRecipes   = {};     // { itemKey: [{ RawMaterialId, QtyPerUnit }] }
+    let prepLoaded   = false;
+
+    /* ══════════════════════════════════════
+       LOAD PREPARATIONS
+    ══════════════════════════════════════ */
+    async function loadPreparations() {
+      HS.loading(true, 'Loading preparations…');
+      try {
+        const [logRes, stockRes, menuRes, recipeRes, rmRes2] = await Promise.all([
+          HS.api({ action: 'getPreparationLog' }),
+          HS.api({ action: 'getPreparedStock'  }),
+          HS.api({ action: 'getMenuItems'      }),
+          HS.api({ action: 'getRecipes'        }),
+          HS.api({ action: 'getRawMaterials'   }),
+        ]);
+        prepLog  = logRes.data   || [];
+        // Index stock
+        prepStock = {};
+        (stockRes.data || []).forEach(r => { prepStock[r.ItemKey] = Number(r.AvailableQty) || 0; });
+        // Menu items
+        allMenuItems = menuRes.data || [];
+        // Recipes indexed by itemKey
+        allRecipes = {};
+        (recipeRes.data || []).forEach(r => {
+          if (!allRecipes[r.ItemKey]) allRecipes[r.ItemKey] = [];
+          allRecipes[r.ItemKey].push(r);
+        });
+        // Raw materials map (for preview labels)
+        // Reuse 'materials' state if already loaded, else use fresh data
+        if (!materials.length) materials = rmRes2.data || [];
+        prepLoaded = true;
+        renderPreparations();
+      } catch(e) {
+        HS.toast('Could not load preparations.', 'error');
+      } finally { HS.loading(false); }
+    }
+
+    /* ══════════════════════════════════════
+       RENDER PREPARATIONS
+    ══════════════════════════════════════ */
+    function renderPreparations() {
+      const menuItemsWithStock = allMenuItems.filter(m =>
+        (prepStock[m.ItemKey] || 0) > 0 || prepLog.some(p => p.ItemKey === m.ItemKey)
+      );
+      const totalBatches = prepLog.length;
+      const totalItems   = allMenuItems.filter(m => (prepStock[m.ItemKey] || 0) > 0).length;
+
+      let html = '';
+
+      // Summary bar
+      if (totalBatches > 0) {
+        html += `<div class="prep-summary">
+          <div class="prep-summary-cell">
+            <div class="prep-summary-val">${totalBatches}</div>
+            <div class="prep-summary-lbl">Batches Logged</div>
+          </div>
+          <div class="prep-summary-cell">
+            <div class="prep-summary-val">${totalItems}</div>
+            <div class="prep-summary-lbl">Items In Stock</div>
+          </div>
+        </div>`;
+      }
+
+      // Prepared stock grid
+      const stockItems = allMenuItems.filter(m => prepLog.some(p => p.ItemKey === m.ItemKey));
+      if (stockItems.length) {
+        html += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">PREPARED STOCK</div>`;
+        html += `<div class="prep-stock-grid">`;
+        stockItems.forEach(m => {
+          const qty    = prepStock[m.ItemKey] || 0;
+          const isZero = qty === 0;
+          html += `<div class="prep-stock-card${isZero?' zero':''}">
+            <div class="prep-stock-name" title="${m.ItemName}">${m.ItemName}</div>
+            <div class="prep-stock-qty${isZero?' zero':''}">${qty}</div>
+            <div class="prep-stock-lbl">units available</div>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      // Preparation log
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);">PREPARATION LOG</div>
+        <button class="hs-btn hs-btn-primary hs-btn-sm" onclick="openAddPrep()">+ Log Batch</button>
+      </div>`;
+
+      if (!prepLog.length) {
+        html += `<div class="hs-empty">
+          <div class="hs-empty-icon">🍳</div>
+          <div class="hs-empty-title">No preparations yet</div>
+          <div class="hs-empty-sub">Tap "Log Batch" to record your first preparation.</div>
+        </div>`;
+      } else {
+        html += prepLog.map(p => prepCardHTML(p)).join('');
+      }
+
+      document.getElementById('prepContent').innerHTML = html;
+    }
+
+    function prepCardHTML(p) {
+      const m    = allMenuItems.find(m => m.ItemKey === p.ItemKey);
+      const name = m ? m.ItemName : p.ItemKey;
+      const date = HS.formatDate(p.PreparedAt) || p.PreparedAt || '—';
+      const qty  = Number(p.QtyPrepared || 0);
+
+      // Ingredient summary for this batch
+      const lines = allRecipes[p.ItemKey] || [];
+      const ingLines = lines.map(l => {
+        const rm  = materials.find(m => m.RawMaterialId === l.RawMaterialId);
+        const rmName = rm ? rm.Name : l.RawMaterialId;
+        const used   = Number(l.QtyPerUnit) * qty;
+        const disp   = used % 1 === 0 ? used.toLocaleString('en-IN') : used.toFixed(4).replace(/\.?0+$/,'');
+        return `<span style="font-size:11px;color:var(--text-muted);">${rmName}: ${disp} ${rm?.Unit||''}</span>`;
+      }).join(' &nbsp;·&nbsp; ');
+
+      return `
+        <div class="prep-card">
+          <div class="prep-card-top">
+            <div class="prep-card-meta">
+              <div class="prep-card-name">${name}</div>
+              <div class="prep-card-date">${date}</div>
+              ${p.Note ? `<div class="prep-card-note">${p.Note}</div>` : ''}
+              ${ingLines ? `<div style="margin-top:6px;line-height:1.8;">${ingLines}</div>` : ''}
+            </div>
+            <div class="prep-card-right">
+              <div class="prep-card-qty">${qty}</div>
+              <div class="prep-card-qty-lbl">units</div>
+              <div class="prep-card-actions">
+                <button class="prep-action-btn" style="background:rgba(61,99,56,.12);"
+                  onclick="openEditPrep('${p.PrepId}')" title="Edit">✏️</button>
+                <button class="prep-action-btn" style="background:rgba(184,50,37,.10);"
+                  onclick="openDeletePrep('${p.PrepId}')" title="Delete">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    /* ══════════════════════════════════════
+       PREPARATION MODAL OPEN/CLOSE
+    ══════════════════════════════════════ */
+    function populatePrepItemSelect(selectedKey) {
+      const sel = document.getElementById('prepItemKey');
+      sel.innerHTML = '<option value="">-- Select item --</option>' +
+        allMenuItems.map(m =>
+          `<option value="${m.ItemKey}" ${m.ItemKey===selectedKey?'selected':''}>${m.ItemName}</option>`
+        ).join('');
+    }
+
+    function openAddPrep() {
+      document.getElementById('prepModalTitle').textContent = 'Log Preparation';
+      document.getElementById('prepId').value   = '';
+      document.getElementById('prepDate').value = HS.today();
+      document.getElementById('prepQty').value  = '';
+      document.getElementById('prepNote').value = '';
+      populatePrepItemSelect('');
+      document.getElementById('prepPreview').style.display = 'none';
+      document.getElementById('prepShortfall').style.display = 'none';
+      HS.openModal('prepModal');
+    }
+
+    function openEditPrep(prepId) {
+      const p = prepLog.find(p => p.PrepId === prepId);
+      if (!p) return;
+      document.getElementById('prepModalTitle').textContent = 'Edit Preparation';
+      document.getElementById('prepId').value   = prepId;
+      document.getElementById('prepDate').value = p.PreparedAt || HS.today();
+      document.getElementById('prepQty').value  = p.QtyPrepared || '';
+      document.getElementById('prepNote').value = p.Note || '';
+      populatePrepItemSelect(p.ItemKey);
+      // Disable item change on edit (changing item would make the deduction math wrong)
+      document.getElementById('prepItemKey').disabled = true;
+      updateIngredientPreview();
+      HS.openModal('prepModal');
+    }
+
+    function onPrepItemChange() {
+      document.getElementById('prepQty').value = '';
+      document.getElementById('prepPreview').style.display = 'none';
+      document.getElementById('prepShortfall').style.display = 'none';
+    }
+
+    /* ══════════════════════════════════════
+       INGREDIENT PREVIEW
+    ══════════════════════════════════════ */
+    function updateIngredientPreview() {
+      const itemKey = document.getElementById('prepItemKey').value;
+      const qty     = Number(document.getElementById('prepQty').value) || 0;
+      const preview = document.getElementById('prepPreview');
+      const shortfall = document.getElementById('prepShortfall');
+
+      if (!itemKey || qty <= 0) { preview.style.display = 'none'; return; }
+
+      const lines = allRecipes[itemKey] || [];
+      if (!lines.length) { preview.style.display = 'none'; return; }
+
+      // Calculate deductions
+      const deductions = lines.map(l => {
+        const rm     = materials.find(m => m.RawMaterialId === l.RawMaterialId);
+        const name   = rm ? rm.Name : l.RawMaterialId;
+        const unit   = rm ? rm.Unit : '';
+        const have   = Number(rm?.TotalQty || 0);
+        const needed = Number(l.QtyPerUnit) * qty;
+        const disp   = needed % 1 === 0 ? needed.toLocaleString('en-IN') : needed.toFixed(4).replace(/\.?0+$/,'');
+        const isShort = needed > have;
+        return { name, unit, needed, have, disp, isShort };
+      });
+
+      const shortfalls = deductions.filter(d => d.isShort);
+
+      document.getElementById('prepPreviewLines').innerHTML = deductions.map(d => `
+        <div style="display:flex;justify-content:space-between;padding:5px 0;
+                    border-bottom:1px solid rgba(0,0,0,.05);font-size:12.5px;">
+          <span style="color:var(--brown-dark);">${d.name}</span>
+          <span style="font-weight:700;color:${d.isShort?'var(--red)':'var(--green)'};">
+            ${d.disp} ${d.unit}
+            ${d.isShort ? `<span style="font-size:11px;">(have ${d.have})</span>` : ''}
+          </span>
+        </div>`).join('');
+
+      if (shortfalls.length) {
+        shortfall.style.display = '';
+        document.getElementById('prepShortfallList').innerHTML = shortfalls.map(d =>
+          `<li>${d.name}: need ${d.needed.toFixed(4).replace(/\.?0+$/,'')} ${d.unit}, have ${d.have}</li>`
+        ).join('');
+      } else {
+        shortfall.style.display = 'none';
+      }
+
+      preview.style.display = '';
+    }
+
+    /* ══════════════════════════════════════
+       SAVE PREPARATION
+    ══════════════════════════════════════ */
+    async function savePreparation() {
+      const prepId  = document.getElementById('prepId').value;
+      const itemKey = document.getElementById('prepItemKey').value;
+      const preparedAt = document.getElementById('prepDate').value;
+      const qtyVal  = document.getElementById('prepQty').value.trim();
+      const note    = document.getElementById('prepNote').value.trim();
+
+      if (!itemKey)    { HS.toast('Select a menu item.', 'error'); return; }
+      if (!preparedAt) { HS.toast('Date is required.', 'error'); return; }
+      if (!qtyVal)     { HS.toast('Quantity is required.', 'error'); return; }
+      const qty = Number(qtyVal);
+      if (isNaN(qty) || qty <= 0) { HS.toast('Enter a valid quantity.', 'error'); return; }
+
+      HS.closeModal('prepModal');
+      document.getElementById('prepItemKey').disabled = false;
+      HS.loading(true, prepId ? 'Updating…' : 'Saving…');
+
+      try {
+        const action = prepId ? 'updatePreparation' : 'addPreparation';
+        const data   = { prepId, itemKey, qty, preparedAt, note };
+        const res    = await HS.api({ action, data: JSON.stringify(data) });
+
+        if (res.success) {
+          HS.toast(prepId ? '✅ Preparation updated!' : '✅ Preparation logged!', 'success');
+          prepLoaded = false;
+          await loadPreparations();
+          // Also refresh raw materials list since stock changed
+          await loadAll();
+        } else if (res.error === 'Insufficient raw materials' && res.shortfalls) {
+          // Show shortfall toast
+          HS.toast('⚠️ Not enough raw materials. Check preview.', 'error');
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    /* ══════════════════════════════════════
+       DELETE PREPARATION
+    ══════════════════════════════════════ */
+    function openDeletePrep(prepId) {
+      const p    = prepLog.find(p => p.PrepId === prepId);
+      const m    = allMenuItems.find(m => m.ItemKey === p?.ItemKey);
+      const name = m ? m.ItemName : p?.ItemKey || '';
+      const qty  = Number(p?.QtyPrepared || 0);
+      const lines = allRecipes[p?.ItemKey || ''] || [];
+
+      document.getElementById('prepDeleteId').value = prepId;
+
+      const hasRecipe = lines.length > 0;
+      document.getElementById('prepDeleteDesc').innerHTML = `
+        Deleting <strong>${qty} units of ${name}</strong> prepared on ${HS.formatDate(p?.PreparedAt)||p?.PreparedAt||'—'}.
+        ${hasRecipe
+          ? `<br/><br/>This batch consumed raw materials. What should happen to them?`
+          : `<br/><br/>This item has no recipe — no raw materials to restore.`}`;
+
+      // If no recipe, show only one option
+      if (!hasRecipe) {
+        HS.confirm(`Delete this preparation of ${qty} units of ${name}? This cannot be undone.`, async () => {
+          await doDeletePrep(prepId, false);
+        });
+      } else {
+        HS.openModal('prepDeleteModal');
+      }
+    }
+
+    async function confirmDeletePrep(restoreRawMaterials) {
+      const prepId = document.getElementById('prepDeleteId').value;
+      HS.closeModal('prepDeleteModal');
+      await doDeletePrep(prepId, restoreRawMaterials);
+    }
+
+    async function doDeletePrep(prepId, restoreRawMaterials) {
+      HS.loading(true, 'Deleting…');
+      try {
+        const res = await HS.api({
+          action: 'deletePreparation',
+          prepId,
+          restoreRawMaterials: restoreRawMaterials ? 'true' : 'false',
+        });
+        if (res.success) {
+          HS.toast('Preparation deleted.', 'success');
+          prepLoaded = false;
+          await loadPreparations();
+          if (restoreRawMaterials) await loadAll(); // refresh raw materials qty
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
     }
   </script>
 </body>

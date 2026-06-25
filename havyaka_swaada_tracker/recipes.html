@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Recipes — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    /* ── Item section ── */
+    .recipe-section {
+      background: var(--cream-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    .recipe-section.highlighted {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 2px var(--gold-pale);
+    }
+    .recipe-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 14px;
+      cursor: pointer;
+      gap: 10px;
+      user-select: none;
+    }
+    .recipe-section-header:active { background: var(--cream-dark); }
+    .recipe-item-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--brown);
+      flex: 1;
+      min-width: 0;
+    }
+    .recipe-item-cat {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .recipe-count-badge {
+      background: var(--green);
+      color: #fff;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .recipe-count-badge.empty {
+      background: var(--border);
+      color: var(--text-muted);
+    }
+    .recipe-chevron {
+      color: var(--text-muted);
+      font-size: 13px;
+      flex-shrink: 0;
+      transition: transform .2s;
+    }
+    .recipe-chevron.open { transform: rotate(180deg); }
+
+    /* ── Recipe lines ── */
+    .recipe-body {
+      padding: 0 14px 12px;
+      border-top: 1px dashed var(--border);
+    }
+    .recipe-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(0,0,0,.04);
+      gap: 8px;
+    }
+    .recipe-line:last-child { border-bottom: none; }
+    .recipe-line-name {
+      flex: 1;
+      min-width: 0;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--brown-dark);
+    }
+    .recipe-line-qty {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--green);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .recipe-line-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .recipe-line-btn {
+      width: 28px; height: 28px;
+      border-radius: 7px; border: none;
+      font-size: 13px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .recipe-line-btn:active { filter: brightness(.85); }
+
+    .recipe-add-btn {
+      width: 100%; margin-top: 10px;
+      padding: 8px;
+      border: 1.5px dashed var(--gold);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--gold);
+      font-family: 'Nunito', sans-serif;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+    }
+    .recipe-add-btn:active { background: var(--gold-pale); }
+
+    /* ── Inline edit row ── */
+    .recipe-inline-form {
+      background: var(--cream);
+      border: 1.5px solid var(--gold);
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 8px;
+    }
+    .recipe-inline-form .hs-label { font-size: 11.5px; }
+
+    /* ── Unit compat warning ── */
+    .unit-warn {
+      background: rgba(184,50,37,.08);
+      border: 1px solid rgba(184,50,37,.2);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: var(--red);
+      margin-top: 6px;
+      display: none;
+    }
+
+    /* ── Search ── */
+    .recipe-search {
+      width: 100%;
+      padding: 9px 12px;
+      margin-bottom: 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--cream);
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px;
+      color: var(--brown);
+      outline: none;
+    }
+    .recipe-search:focus { border-color: var(--gold); }
+
+    /* ── Summary pill ── */
+    .recipe-summary-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--brown);
+      color: var(--cream);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page">
+
+    <div class="recipe-summary-pill" id="summaryPill" style="display:none;">
+      <span>🧪</span>
+      <span id="summaryText"></span>
+    </div>
+
+    <input class="recipe-search" type="text" id="recipeSearch"
+           placeholder="Search menu items…" oninput="filterItems()" />
+
+    <div id="recipeList">
+      <div class="hs-empty">
+        <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+        <div class="hs-empty-sub">Loading…</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ══ EDIT QTY MODAL ══ -->
+  <div class="hs-modal-bg" id="editLineModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title">Edit Quantity</div>
+      <div class="hs-modal-subtitle" id="editLineDesc"
+           style="font-size:12px;color:var(--text-muted);margin-bottom:14px;"></div>
+      <input type="hidden" id="editLineRecipeId" />
+
+      <div class="hs-field">
+        <label class="hs-label" id="editLineQtyLabel">Qty per unit *</label>
+        <input class="hs-input" type="number" id="editLineQty" min="0" step="any" />
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveEditLine()">💾 Save</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('editLineModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/common.js"></script>
+  <script>
+    /* ── State ── */
+    let allMenuItems  = [];   // global menu item library
+    let allRawMats    = [];   // active raw materials only
+    let allRecipes    = {};   // { itemKey: [{ RecipeId, RawMaterialId, QtyPerUnit }, …] }
+    let expanded      = {};   // { itemKey: bool }
+    let addingFor     = null; // itemKey currently showing inline add form
+    let searchQuery   = '';
+
+    /* ── Unit groups & factors ── */
+    const UNIT_GROUPS = {
+      weight: ['mg','gms','kg'],
+      volume: ['ml','litres'],
+      count:  ['count'],
+    };
+    const UNIT_LABELS = { mg:'mg', gms:'gms', kg:'kg', ml:'ml', litres:'litres', count:'' };
+
+    function unitGroup(u) {
+      for (const [g, arr] of Object.entries(UNIT_GROUPS))
+        if (arr.includes(u)) return g;
+      return null;
+    }
+
+    /* ── INIT ── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      HS.renderHeader({ title: 'Recipes', subtitle: 'Global BOM', showBack: true });
+      await loadAll();
+
+      // If launched from menu page with a specific itemKey, scroll + expand it
+      const focusKey = HS.getParam('itemKey');
+      if (focusKey) {
+        expanded[focusKey] = true;
+        renderList();
+        setTimeout(() => {
+          const el = document.getElementById('rs-' + focusKey);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+      }
+    });
+
+    /* ── LOAD ── */
+    async function loadAll() {
+      HS.loading(true, 'Loading recipes…');
+      try {
+        const [menuRes, rmRes, recRes] = await Promise.all([
+          HS.api({ action: 'getMenuItems' }),
+          HS.api({ action: 'getRawMaterials' }),
+          HS.api({ action: 'getRecipes' }),
+        ]);
+        allMenuItems = (menuRes.data || []).sort((a,b) =>
+          (a.Category||'').localeCompare(b.Category||'') ||
+          (a.ItemName||'').localeCompare(b.ItemName||'')
+        );
+        // Only active raw materials can be used in recipes
+        allRawMats = (rmRes.data || []).filter(m => m.Status !== 'archived');
+
+        // Index recipes by ItemKey
+        allRecipes = {};
+        (recRes.data || []).forEach(r => {
+          if (!allRecipes[r.ItemKey]) allRecipes[r.ItemKey] = [];
+          allRecipes[r.ItemKey].push(r);
+        });
+
+        renderSummary();
+        renderList();
+      } catch(e) {
+        HS.toast('Could not load data.', 'error');
+      } finally { HS.loading(false); }
+    }
+
+    /* ── SUMMARY ── */
+    function renderSummary() {
+      const withRecipe = allMenuItems.filter(m => (allRecipes[m.ItemKey]||[]).length > 0).length;
+      const pill = document.getElementById('summaryPill');
+      pill.style.display = allMenuItems.length ? '' : 'none';
+      document.getElementById('summaryText').textContent =
+        `${withRecipe} of ${allMenuItems.length} items have a recipe`;
+    }
+
+    /* ── FILTER ── */
+    function filterItems() {
+      searchQuery = document.getElementById('recipeSearch').value.toLowerCase();
+      renderList();
+    }
+
+    /* ── RENDER LIST ── */
+    function renderList() {
+      const filtered = allMenuItems.filter(m =>
+        !searchQuery || m.ItemName.toLowerCase().includes(searchQuery)
+      );
+
+      if (!filtered.length) {
+        document.getElementById('recipeList').innerHTML = `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">🧪</div>
+            <div class="hs-empty-title">No items found</div>
+            <div class="hs-empty-sub">All menu items you create appear here for recipe setup.</div>
+          </div>`;
+        return;
+      }
+
+      document.getElementById('recipeList').innerHTML =
+        filtered.map(m => itemSectionHTML(m)).join('');
+    }
+
+    /* ── ITEM SECTION HTML ── */
+    function itemSectionHTML(m) {
+      const key     = m.ItemKey;
+      const lines   = allRecipes[key] || [];
+      const isOpen  = expanded[key];
+      const isHigh  = HS.getParam('itemKey') === key;
+
+      const badgeCls = lines.length ? '' : ' empty';
+      const badgeTxt = lines.length ? `${lines.length} ingredient${lines.length>1?'s':''}` : 'No recipe';
+
+      let body = '';
+      if (isOpen) {
+        body = `<div class="recipe-body">`;
+        if (lines.length) {
+          body += lines.map(line => recipeLineHTML(key, line)).join('');
+        } else {
+          body += `<div style="font-size:12.5px;color:var(--text-muted);padding:8px 0;">
+            No ingredients yet. Tap below to add the first one.
+          </div>`;
+        }
+
+        // Inline add form or add button
+        if (addingFor === key) {
+          body += inlineAddFormHTML(key);
+        } else {
+          body += `<button class="recipe-add-btn" onclick="startAdding('${key}')">
+            ＋ Add Ingredient
+          </button>`;
+        }
+
+        body += `</div>`;
+      }
+
+      return `
+        <div class="recipe-section${isHigh?' highlighted':''}" id="rs-${key}">
+          <div class="recipe-section-header" onclick="toggleSection('${key}')">
+            <div>
+              <div class="recipe-item-name">${m.ItemName}</div>
+              ${m.Category ? `<div class="recipe-item-cat">${m.Category}</div>` : ''}
+            </div>
+            <span class="recipe-count-badge${badgeCls}">${badgeTxt}</span>
+            <span class="recipe-chevron${isOpen?' open':''}">▼</span>
+          </div>
+          ${body}
+        </div>`;
+    }
+
+    /* ── RECIPE LINE HTML ── */
+    function recipeLineHTML(itemKey, line) {
+      const rm   = allRawMats.find(m => m.RawMaterialId === line.RawMaterialId);
+      const name = rm ? rm.Name : `[Archived: ${line.RawMaterialId}]`;
+      const unit = rm ? rm.Unit : '';
+      const qty  = Number(line.QtyPerUnit);
+      const qtyDisplay = qty % 1 === 0 ? qty.toLocaleString('en-IN') : qty.toFixed(4).replace(/\.?0+$/, '');
+
+      return `
+        <div class="recipe-line" id="rl-${line.RecipeId}">
+          <div class="recipe-line-name">${name}</div>
+          <div class="recipe-line-qty">${qtyDisplay} ${unit}</div>
+          <div class="recipe-line-actions">
+            <button class="recipe-line-btn" style="background:rgba(61,99,56,.12);"
+              onclick="openEditLine('${line.RecipeId}','${itemKey}')" title="Edit qty">✏️</button>
+            <button class="recipe-line-btn" style="background:rgba(184,50,37,.10);"
+              onclick="deleteLine('${line.RecipeId}','${itemKey}')" title="Remove">🗑️</button>
+          </div>
+        </div>`;
+    }
+
+    /* ── INLINE ADD FORM HTML ── */
+    function inlineAddFormHTML(itemKey) {
+      // Determine which raw materials are already used in this recipe
+      const usedIds = new Set((allRecipes[itemKey]||[]).map(l => l.RawMaterialId));
+      const available = allRawMats.filter(m => !usedIds.has(m.RawMaterialId));
+
+      if (!available.length) {
+        return `<div class="recipe-inline-form">
+          <div style="font-size:12.5px;color:var(--text-muted);">
+            All active raw materials are already in this recipe.
+          </div>
+          <div class="hs-mt-sm">
+            <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="cancelAdding()">Cancel</button>
+          </div>
+        </div>`;
+      }
+
+      const opts = available.map(m =>
+        `<option value="${m.RawMaterialId}" data-unit="${m.Unit}">${m.Name} (${m.Unit})</option>`
+      ).join('');
+
+      return `
+        <div class="recipe-inline-form" id="inlineForm-${itemKey}">
+          <div class="hs-field">
+            <label class="hs-label">Raw Material *</label>
+            <select class="hs-input" id="addRmSel-${itemKey}" onchange="onRmSelect('${itemKey}')">
+              <option value="">-- Select --</option>
+              ${opts}
+            </select>
+          </div>
+          <div class="hs-field" id="addQtyField-${itemKey}" style="display:none;">
+            <label class="hs-label" id="addQtyLabel-${itemKey}">Qty per unit *</label>
+            <input class="hs-input" type="number" id="addQty-${itemKey}"
+                   min="0" step="any" placeholder="e.g. 100" />
+          </div>
+          <div class="unit-warn" id="unitWarn-${itemKey}"></div>
+          <div class="hs-mt" style="display:flex;gap:8px;">
+            <button class="hs-btn hs-btn-primary" style="flex:1;"
+              onclick="saveNewLine('${itemKey}')">✓ Add</button>
+            <button class="hs-btn hs-btn-ghost" style="flex:1;"
+              onclick="cancelAdding()">Cancel</button>
+          </div>
+        </div>`;
+    }
+
+    /* ── TOGGLE SECTION ── */
+    function toggleSection(itemKey) {
+      // Cancel any in-progress add form when closing
+      if (expanded[itemKey] && addingFor === itemKey) addingFor = null;
+      expanded[itemKey] = !expanded[itemKey];
+      renderList();
+    }
+
+    /* ── INLINE ADD FLOW ── */
+    function startAdding(itemKey) {
+      addingFor = itemKey;
+      // Re-render just the section to show form
+      const m = allMenuItems.find(m => m.ItemKey === itemKey);
+      if (m) {
+        const el = document.getElementById('rs-' + itemKey);
+        if (el) el.outerHTML = itemSectionHTML(m);
+      }
+    }
+
+    function cancelAdding() {
+      const key = addingFor;
+      addingFor = null;
+      const m = allMenuItems.find(m => m.ItemKey === key);
+      if (m) {
+        const el = document.getElementById('rs-' + key);
+        if (el) el.outerHTML = itemSectionHTML(m);
+      }
+    }
+
+    function onRmSelect(itemKey) {
+      const sel  = document.getElementById('addRmSel-' + itemKey);
+      const rmId = sel.value;
+      const qtyField = document.getElementById('addQtyField-' + itemKey);
+      const warn     = document.getElementById('unitWarn-' + itemKey);
+      warn.style.display = 'none';
+
+      if (!rmId) { qtyField.style.display = 'none'; return; }
+
+      const rm   = allRawMats.find(m => m.RawMaterialId === rmId);
+      const unit = rm ? rm.Unit : '';
+      document.getElementById('addQtyLabel-' + itemKey).textContent = `Qty per unit (${unit}) *`;
+      qtyField.style.display = '';
+      document.getElementById('addQty-' + itemKey).focus();
+    }
+
+    async function saveNewLine(itemKey) {
+      const sel    = document.getElementById('addRmSel-' + itemKey);
+      const rmId   = sel ? sel.value : '';
+      const qtyEl  = document.getElementById('addQty-' + itemKey);
+      const qtyVal = qtyEl ? qtyEl.value.trim() : '';
+
+      if (!rmId)   { HS.toast('Select a raw material.', 'error'); return; }
+      if (!qtyVal) { HS.toast('Quantity is required.', 'error');  return; }
+      const qty = Number(qtyVal);
+      if (isNaN(qty) || qty <= 0) { HS.toast('Enter a valid quantity greater than 0.', 'error'); return; }
+
+      HS.loading(true, 'Saving…');
+      try {
+        const res = await HS.api({
+          action: 'saveRecipe',
+          data: JSON.stringify({ itemKey, rawMaterialId: rmId, qtyPerUnit: qty }),
+        });
+        if (res.success) {
+          // Update local state
+          if (!allRecipes[itemKey]) allRecipes[itemKey] = [];
+          allRecipes[itemKey].push({
+            RecipeId: res.recipeId, ItemKey: itemKey,
+            RawMaterialId: rmId, QtyPerUnit: qty,
+          });
+          addingFor = null;
+          renderSummary();
+          renderList();
+          HS.toast('✅ Ingredient added!', 'success');
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    /* ── EDIT LINE ── */
+    function openEditLine(recipeId, itemKey) {
+      const line = (allRecipes[itemKey]||[]).find(l => l.RecipeId === recipeId);
+      const rm   = allRawMats.find(m => m.RawMaterialId === line?.RawMaterialId);
+      if (!line) return;
+
+      const qty = Number(line.QtyPerUnit);
+      const qtyDisplay = qty % 1 === 0 ? qty : qty.toFixed(4).replace(/\.?0+$/, '');
+
+      document.getElementById('editLineRecipeId').value = recipeId;
+      document.getElementById('editLineDesc').textContent =
+        `${rm?.Name || line.RawMaterialId} · per unit of ${allMenuItems.find(m=>m.ItemKey===itemKey)?.ItemName || itemKey}`;
+      document.getElementById('editLineQtyLabel').textContent = `Qty per unit (${rm?.Unit || ''}) *`;
+      document.getElementById('editLineQty').value = qtyDisplay;
+
+      // Store itemKey for post-save update
+      document.getElementById('editLineRecipeId').dataset.itemKey = itemKey;
+      HS.openModal('editLineModal');
+    }
+
+    async function saveEditLine() {
+      const recipeId = document.getElementById('editLineRecipeId').value;
+      const itemKey  = document.getElementById('editLineRecipeId').dataset.itemKey;
+      const qtyVal   = document.getElementById('editLineQty').value.trim();
+      if (!qtyVal) { HS.toast('Quantity is required.', 'error'); return; }
+      const qty = Number(qtyVal);
+      if (isNaN(qty) || qty <= 0) { HS.toast('Enter a valid quantity.', 'error'); return; }
+
+      HS.closeModal('editLineModal');
+      HS.loading(true, 'Saving…');
+      try {
+        const res = await HS.api({
+          action: 'saveRecipe',
+          data: JSON.stringify({ recipeId, itemKey, qtyPerUnit: qty }),
+        });
+        if (res.success) {
+          // Update local state
+          const lines = allRecipes[itemKey] || [];
+          const line  = lines.find(l => l.RecipeId === recipeId);
+          if (line) line.QtyPerUnit = qty;
+          renderList();
+          HS.toast('✅ Updated!', 'success');
+        } else { HS.toast('Error: ' + (res.error || 'Unknown'), 'error'); }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    /* ── DELETE LINE ── */
+    async function deleteLine(recipeId, itemKey) {
+      const line = (allRecipes[itemKey]||[]).find(l => l.RecipeId === recipeId);
+      const rm   = allRawMats.find(m => m.RawMaterialId === line?.RawMaterialId);
+      HS.confirm(`Remove "${rm?.Name || 'this ingredient'}" from the recipe?`, async () => {
+        HS.loading(true, 'Removing…');
+        try {
+          const res = await HS.api({ action: 'deleteRecipeLine', recipeId });
+          if (res.success) {
+            // Update local state
+            allRecipes[itemKey] = (allRecipes[itemKey]||[]).filter(l => l.RecipeId !== recipeId);
+            renderSummary();
+            renderList();
+            HS.toast('Ingredient removed.', 'success');
+          } else { HS.toast('Error: ' + (res.error || 'Unknown'), 'error'); }
+        } catch(e) { HS.toast('Network error.', 'error'); }
+        finally { HS.loading(false); }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -325,6 +325,7 @@
               style="opacity:${isFirst?'0.25':'1'};pointer-events:${isFirst?'none':'auto'}">↑</button>
             <button class="icon-btn" title="Move down" onclick="moveItem('${it.ItemKey}',1)"
               style="opacity:${isLast?'0.25':'1'};pointer-events:${isLast?'none':'auto'}">↓</button>
+            <button class="icon-btn" title="Recipe / BOM" onclick="HS.navigate('recipes.html',{itemKey:'${it.ItemKey}'})">🧪</button>
             <button class="icon-btn" title="Edit"    onclick="openEditModal('${it.ItemKey}')">✏️</button>
             <button class="icon-btn danger" title="Archive" onclick="doArchive('${it.ItemKey}')">📦</button>
           </div>

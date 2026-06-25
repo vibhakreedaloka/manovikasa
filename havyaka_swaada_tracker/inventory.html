@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Inventory — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    /* ── Global stock banner ── */
+    .inv-global-banner {
+      background: linear-gradient(135deg, var(--brown) 0%, var(--brown-mid) 100%);
+      border-radius: var(--radius);
+      padding: 13px 14px;
+      margin-bottom: 14px;
+      color: #fff;
+    }
+    .inv-global-title {
+      font-size: 11px; font-weight: 700; opacity: .7;
+      letter-spacing: .5px; margin-bottom: 8px;
+    }
+    .inv-global-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .inv-global-chip {
+      background: rgba(255,255,255,.15);
+      border-radius: 20px;
+      padding: 4px 11px;
+      font-size: 12px; font-weight: 700;
+    }
+    .inv-global-chip.zero { background: rgba(184,50,37,.35); }
+
+    /* ── Item cards ── */
+    .inv-item-card {
+      background: var(--cream-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-sm);
+    }
+    .inv-item-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 8px; margin-bottom: 10px;
+    }
+    .inv-item-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 15px; font-weight: 700; color: var(--brown);
+    }
+    .inv-item-cat { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .inv-warehouse-tag {
+      font-size: 11px; font-weight: 700;
+      color: var(--brown-mid); white-space: nowrap; flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    /* ── Stat row ── */
+    .inv-stat-row {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: 6px; margin-bottom: 10px;
+    }
+    .inv-stat {
+      background: var(--cream); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 4px; text-align: center;
+    }
+    .inv-stat-val {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px; font-weight: 700; color: var(--brown); line-height: 1;
+    }
+    .inv-stat-val.green { color: var(--green); }
+    .inv-stat-val.red   { color: var(--red); }
+    .inv-stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+    /* ── Actions ── */
+    .inv-item-actions { display: flex; gap: 8px; }
+
+    /* ── Allocation log ── */
+    .inv-alloc-list {
+      margin-top: 10px;
+      border-top: 1px dashed var(--border);
+      padding-top: 8px;
+    }
+    .inv-alloc-row {
+      display: flex; align-items: flex-start;
+      justify-content: space-between;
+      font-size: 12px; padding: 6px 0;
+      border-bottom: 1px solid rgba(0,0,0,.04); gap: 8px;
+    }
+    .inv-alloc-row:last-child { border-bottom: none; }
+    .inv-alloc-date { color: var(--text-muted); font-weight: 700; flex-shrink: 0; min-width: 62px; }
+    .inv-alloc-detail { flex: 1; color: var(--brown-mid); min-width: 0; line-height: 1.5; }
+    .inv-alloc-note { font-size: 11px; color: var(--text-muted); }
+    .inv-alloc-status {
+      font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; flex-shrink: 0; margin-top: 1px;
+    }
+    .inv-alloc-status.active   { background: rgba(61,99,56,.12); color: var(--green); }
+    .inv-alloc-status.returned { background: rgba(160,144,112,.2); color: var(--brown-mid); }
+
+    /* ── Return modal split rows ── */
+    .return-split-row {
+      display: flex; align-items: center;
+      gap: 10px; padding: 11px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .return-split-row:last-child { border-bottom: none; }
+    .return-split-icon  { font-size: 22px; flex-shrink: 0; }
+    .return-split-info  { flex: 1; }
+    .return-split-label { font-size: 13px; font-weight: 700; color: var(--brown-dark); }
+    .return-split-sub   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .return-split-input { width: 72px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page">
+    <div id="invContent">
+      <div class="hs-empty">
+        <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+        <div class="hs-empty-sub">Loading inventory…</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══ ALLOCATE TO MELA MODAL ══ -->
+  <div class="hs-modal-bg" id="allocModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="allocModalTitle">Take to Mela</div>
+      <div id="allocModalSub"
+           style="font-size:12px;color:var(--text-muted);margin-bottom:14px;"></div>
+      <input type="hidden" id="allocItemKey" />
+
+      <div class="hs-field">
+        <label class="hs-label" id="allocQtyLabel">Quantity *</label>
+        <input class="hs-input" type="number" id="allocQty"
+               min="1" step="1" placeholder="How many units?" />
+        <div id="allocStockWarn"
+             style="font-size:11.5px;color:var(--red);margin-top:4px;display:none;"></div>
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Date *</label>
+        <input class="hs-input" type="date" id="allocDate" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Note <span class="hs-opt">optional</span></label>
+        <input class="hs-input" type="text" id="allocNote"
+               placeholder="Morning top-up, Day 1…" autocomplete="off" />
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveAllocation()">
+          📦 Confirm Allocation
+        </button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full"
+                onclick="HS.closeModal('allocModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RETURN FROM MELA MODAL ══ -->
+  <div class="hs-modal-bg" id="returnModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title">Return / Dispose</div>
+      <div id="returnModalSub"
+           style="font-size:12px;color:var(--text-muted);margin-bottom:4px;"></div>
+      <div id="returnStillAtStall"
+           style="font-size:14px;font-weight:700;color:var(--brown);margin-bottom:14px;"></div>
+      <input type="hidden" id="returnAllocId" />
+
+      <div class="return-split-row">
+        <div class="return-split-icon">🏭</div>
+        <div class="return-split-info">
+          <div class="return-split-label">Return to Warehouse</div>
+          <div class="return-split-sub">Goes back to prepared stock</div>
+        </div>
+        <input class="hs-input return-split-input" type="number"
+               id="retQtyStock" min="0" value="0" step="1" />
+      </div>
+      <div class="return-split-row">
+        <div class="return-split-icon">💔</div>
+        <div class="return-split-info">
+          <div class="return-split-label">Damaged / Spoilt</div>
+          <div class="return-split-sub">Lost permanently</div>
+        </div>
+        <input class="hs-input return-split-input" type="number"
+               id="retQtyDamaged" min="0" value="0" step="1" />
+      </div>
+      <div id="returnSplitError"
+           style="font-size:12px;color:var(--red);margin-top:8px;display:none;"></div>
+
+      <div class="hs-field" style="margin-top:14px;">
+        <label class="hs-label">Note <span class="hs-opt">optional</span></label>
+        <input class="hs-input" type="text" id="retNote"
+               placeholder="End of Day 2, damaged in transit…" autocomplete="off" />
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveReturn()">
+          ✅ Confirm
+        </button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full"
+                onclick="HS.closeModal('returnModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/common.js"></script>
+  <script>
+    /* ── State ── */
+    let mela        = null;
+    let melaMenu    = [];   // active items in this mela
+    let allocations = [];   // MelaAllocations rows for this mela
+    let prepStock   = {};   // { itemKey: availableQty } — global prepared stock
+    let expanded      = {};   // { itemKey: bool }
+    let saleDeductions = {}; // { itemKey: qtySold } for this mela
+
+    /* ── INIT ── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      mela = HS.getCurrentMela();
+      if (!mela) { HS.navigate('index.html'); return; }
+      HS.renderSidebar('inventory');
+      HS.renderHeader({
+        title: 'Inventory', subtitle: mela.MelaName, showMenu: true,
+        rightIcon: '🔄', rightFn: 'loadAll(true)',
+      });
+      await loadAll();
+    });
+
+    /* ── LOAD ── */
+    async function loadAll(force = false) {
+      HS.loading(true, 'Loading inventory…');
+      const extra = force ? { noCache: '1' } : {};
+      try {
+        const [menuRes, allocRes, stockRes, dedRes] = await Promise.all([
+          HS.api({ action: 'getMelaMenu',        melaId: mela.MelaId, ...extra }),
+          HS.api({ action: 'getMelaAllocations', melaId: mela.MelaId, ...extra }),
+          HS.api({ action: 'getPreparedStock',    ...extra }),
+          HS.api({ action: 'getSaleDeductions',  melaId: mela.MelaId, ...extra }),
+        ]);
+        melaMenu    = (menuRes.data  || []).filter(i => i.Status === 'active');
+        allocations = allocRes.data  || [];
+        prepStock   = {};
+        (stockRes.data || []).forEach(r => {
+          prepStock[r.ItemKey] = Number(r.AvailableQty) || 0;
+        });
+        saleDeductions = {};
+        (dedRes.data || []).forEach(d => {
+          const k = d.ItemKey;
+          saleDeductions[k] = (saleDeductions[k] || 0) + Number(d.QtySold || 0);
+        });
+        if (force) HS.toast('✅ Refreshed!', 'success');
+        render();
+      } catch(e) {
+        HS.toast('Could not load inventory.', 'error');
+      } finally { HS.loading(false); }
+    }
+
+    /* ── RENDER ── */
+    function render() {
+      // Build per-item allocation summary
+      const summary = {}; // { itemKey: { allocated, returnedToStock, damaged, rows[] } }
+      allocations.forEach(a => {
+        const k = a.ItemKey;
+        if (!summary[k]) summary[k] = { allocated:0, returnedToStock:0, damaged:0, rows:[] };
+        summary[k].allocated        += Number(a.QtyAllocated       || 0);
+        summary[k].returnedToStock  += Number(a.QtyReturnedToStock  || 0);
+        summary[k].damaged          += Number(a.QtyDamaged          || 0);
+        summary[k].rows.push(a);
+      });
+
+      // All item keys: menu items + any keys from allocations (orphaned)
+      const allKeys = [
+        ...melaMenu.map(i => i.ItemKey),
+        ...Object.keys(summary).filter(k => !melaMenu.find(m => m.ItemKey === k)),
+      ];
+
+      if (!allKeys.length) {
+        document.getElementById('invContent').innerHTML = `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">📦</div>
+            <div class="hs-empty-title">No menu items yet</div>
+            <div class="hs-empty-sub">Add items to this mela's menu first, then come back here to allocate inventory.</div>
+          </div>`;
+        return;
+      }
+
+      let html = '';
+
+      // Global prepared stock banner
+      const stockEntries = allKeys
+        .map(k => ({ key: k, qty: prepStock[k] || 0, name: itemName(k) }))
+        .filter(e => e.qty > 0 || (summary[e.key]?.allocated || 0) > 0);
+
+      if (stockEntries.length) {
+        const chips = allKeys.map(k => {
+          const qty  = prepStock[k] || 0;
+          const name = itemName(k);
+          return `<span class="inv-global-chip${qty === 0 ? ' zero' : ''}">
+            ${name}: ${qty}
+          </span>`;
+        }).join('');
+        html += `<div class="inv-global-banner">
+          <div class="inv-global-title">🏭 GLOBAL PREPARED STOCK</div>
+          <div class="inv-global-chips">${chips}</div>
+        </div>`;
+      }
+
+      // Per-item cards
+      allKeys.forEach(itemKey => {
+        const it   = melaMenu.find(m => m.ItemKey === itemKey);
+        const sum  = summary[itemKey] || { allocated:0, returnedToStock:0, damaged:0, rows:[] };
+        // netTaken = gross allocated − returned to warehouse (net units currently out)
+        const netTaken  = sum.allocated - sum.returnedToStock;
+        // sold = real qty sold at this mela from SaleDeductions
+        const sold      = saleDeductions[itemKey] || 0;
+        // At stall = net taken − damaged − sold
+        const atStall   = Math.max(0, netTaken - sum.damaged - sold);
+        const warehouse = prepStock[itemKey] || 0;
+        const isExpanded = expanded[itemKey];
+
+        html += `
+          <div class="inv-item-card">
+            <div class="inv-item-header">
+              <div>
+                <div class="inv-item-name">${itemName(itemKey)}</div>
+                ${it?.Category ? `<div class="inv-item-cat">${it.Category}</div>` : ''}
+              </div>
+              <div class="inv-warehouse-tag">🏭 ${warehouse} in stock</div>
+            </div>
+
+            <div class="inv-stat-row">
+              <div class="inv-stat">
+                <div class="inv-stat-val green">${atStall}</div>
+                <div class="inv-stat-lbl">At Stall</div>
+              </div>
+              <div class="inv-stat">
+                <div class="inv-stat-val">${netTaken}</div>
+                <div class="inv-stat-lbl">Taken</div>
+              </div>
+              <div class="inv-stat">
+                <div class="inv-stat-val${sold > 0 ? ' green' : ''}">${sold}</div>
+                <div class="inv-stat-lbl">Sold</div>
+              </div>
+              <div class="inv-stat">
+                <div class="inv-stat-val${sum.damaged > 0 ? ' red' : ''}">${sum.damaged}</div>
+                <div class="inv-stat-lbl">Damaged</div>
+              </div>
+            </div>
+
+            <div class="inv-item-actions">
+              <button class="hs-btn hs-btn-primary hs-btn-sm" style="flex:1;"
+                onclick="openAllocModal('${itemKey}')">
+                + Take to Mela
+              </button>
+              ${atStall > 0 ? `
+              <button class="hs-btn hs-btn-secondary hs-btn-sm" style="flex:1;"
+                onclick="openReturnModal('${itemKey}')">
+                ↩ Return / Dispose
+              </button>` : ''}
+            </div>
+
+            ${sum.rows.length ? `
+            <div style="margin-top:8px;">
+              <button class="hs-btn hs-btn-ghost" style="width:100%;font-size:12px;padding:6px;"
+                onclick="toggleExpand('${itemKey}')">
+                ${isExpanded
+                  ? '▲ Hide log'
+                  : `▼ ${sum.rows.length} allocation${sum.rows.length > 1 ? 's' : ''}`}
+              </button>
+            </div>
+            ${isExpanded ? `<div class="inv-alloc-list">${sum.rows.map(allocRowHTML).join('')}</div>` : ''}
+            ` : ''}
+          </div>`;
+      });
+
+      document.getElementById('invContent').innerHTML = html;
+    }
+
+    /* ── HELPERS ── */
+    function itemName(itemKey) {
+      const it = melaMenu.find(m => m.ItemKey === itemKey);
+      return it ? it.ItemName : itemKey;
+    }
+
+    function allocRowHTML(a) {
+      const date     = HS.formatDate(a.AllocatedAt) || a.AllocatedAt || '—';
+      const alloc    = Number(a.QtyAllocated       || 0);
+      const ret      = Number(a.QtyReturnedToStock  || 0);
+      const dmg      = Number(a.QtyDamaged          || 0);
+      const status   = a.Status === 'returned' ? 'returned' : 'active';
+      const parts    = [];
+      if (ret) parts.push(`${ret} returned`);
+      if (dmg) parts.push(`${dmg} damaged`);
+      return `
+        <div class="inv-alloc-row">
+          <div class="inv-alloc-date">${date}</div>
+          <div class="inv-alloc-detail">
+            Took ${alloc} units${parts.length ? ' · ' + parts.join(', ') : ''}
+            ${a.ReturnNote ? `<div class="inv-alloc-note">${a.ReturnNote}</div>` : ''}
+          </div>
+          <span class="inv-alloc-status ${status}">
+            ${status === 'returned' ? 'Closed' : 'Active'}
+          </span>
+        </div>`;
+    }
+
+    function toggleExpand(itemKey) {
+      expanded[itemKey] = !expanded[itemKey];
+      render();
+    }
+
+    /* ══ ALLOCATE MODAL ══ */
+    function openAllocModal(itemKey) {
+      const avail = prepStock[itemKey] || 0;
+      document.getElementById('allocItemKey').value          = itemKey;
+      document.getElementById('allocModalTitle').textContent = 'Take to Mela';
+      document.getElementById('allocModalSub').textContent   = itemName(itemKey);
+      document.getElementById('allocQtyLabel').textContent   =
+        `Quantity (max ${avail} available) *`;
+      document.getElementById('allocQty').value  = '';
+      document.getElementById('allocQty').max    = avail;
+      document.getElementById('allocDate').value = HS.today();
+      document.getElementById('allocNote').value = '';
+
+      const warn = document.getElementById('allocStockWarn');
+      if (avail === 0) {
+        warn.textContent    = '⚠️ No prepared stock available in warehouse. Prepare more first.';
+        warn.style.display  = '';
+      } else {
+        warn.style.display = 'none';
+      }
+      HS.openModal('allocModal');
+    }
+
+    async function saveAllocation() {
+      const itemKey = document.getElementById('allocItemKey').value;
+      const qtyVal  = document.getElementById('allocQty').value.trim();
+      const date    = document.getElementById('allocDate').value;
+      const note    = document.getElementById('allocNote').value.trim();
+
+      if (!qtyVal) { HS.toast('Quantity is required.', 'error'); return; }
+      const qty = Number(qtyVal);
+      if (isNaN(qty) || qty <= 0) { HS.toast('Enter a valid quantity.', 'error'); return; }
+      if (!date) { HS.toast('Date is required.', 'error'); return; }
+
+      const avail = prepStock[itemKey] || 0;
+      if (qty > avail) {
+        HS.toast(`Only ${avail} units available in prepared stock.`, 'error');
+        return;
+      }
+
+      HS.closeModal('allocModal');
+      HS.loading(true, 'Allocating…');
+      try {
+        const res = await HS.api({
+          action: 'addMelaAllocation',
+          data: JSON.stringify({ melaId: mela.MelaId, itemKey, qty, note, allocatedAt: date }),
+        });
+        if (res.success) {
+          HS.toast('✅ Allocated to mela!', 'success');
+          await loadAll();
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    /* ══ RETURN MODAL ══ */
+    function openReturnModal(itemKey) {
+      // Use the most recent active allocation for this item
+      const activeAllocs = allocations
+        .filter(a => a.ItemKey === itemKey && a.Status === 'active')
+        .sort((a,b) => (b.AllocatedAt||'').localeCompare(a.AllocatedAt||''));
+      const alloc = activeAllocs[0];
+      if (!alloc) { HS.toast('No active allocation found.', 'error'); return; }
+
+      const allocated  = Number(alloc.QtyAllocated       || 0);
+      const retPrev    = Number(alloc.QtyReturnedToStock  || 0);
+      const dmgPrev    = Number(alloc.QtyDamaged          || 0);
+      // stillAtStall = net taken (allocated − returned) − damaged
+      const stillAtStall = Math.max(0, allocated - retPrev - dmgPrev);
+
+      document.getElementById('returnAllocId').value          = alloc.AllocationId;
+      document.getElementById('returnModalSub').textContent   =
+        `${itemName(itemKey)} · Batch of ${allocated} units`;
+      document.getElementById('returnStillAtStall').textContent =
+        `${stillAtStall} unit${stillAtStall !== 1 ? 's' : ''} currently at stall`;
+      document.getElementById('retQtyStock').value   = 0;
+      document.getElementById('retQtyDamaged').value = 0;
+      document.getElementById('retNote').value       = '';
+      document.getElementById('returnSplitError').style.display = 'none';
+      HS.openModal('returnModal');
+    }
+
+    async function saveReturn() {
+      const allocId    = document.getElementById('returnAllocId').value;
+      const qtyStock   = Number(document.getElementById('retQtyStock').value   || 0);
+      const qtyDamaged = Number(document.getElementById('retQtyDamaged').value || 0);
+      const note       = document.getElementById('retNote').value.trim();
+      const total      = qtyStock + qtyDamaged;
+      const errEl      = document.getElementById('returnSplitError');
+
+      if (total <= 0) {
+        errEl.textContent    = 'Enter at least one non-zero quantity.';
+        errEl.style.display  = '';
+        return;
+      }
+      errEl.style.display = 'none';
+
+      HS.closeModal('returnModal');
+      HS.loading(true, 'Saving return…');
+      try {
+        const res = await HS.api({
+          action: 'returnMelaAllocation',
+          data: JSON.stringify({
+            allocId,
+            melaId: mela.MelaId,
+            qtyReturnedToStock: qtyStock,
+            qtyDamaged,
+            returnNote: note,
+          }),
+        });
+        if (res.success) {
+          HS.toast('✅ Return logged!', 'success');
+          await loadAll();
+        } else {
+          HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+  </script>
+</body>
+</html>
