@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Log Order — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .item-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 0; border-bottom: 1px dashed var(--border);
+    }
+    .item-row:first-child { padding-top: 0; }
+    .item-row:last-child  { border-bottom: none; padding-bottom: 0; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name  { font-size: 14px; font-weight: 700; color: var(--brown); }
+    .item-price { font-size: 12px; color: var(--gold); font-weight: 600; margin-top: 2px; }
+    .pay-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pay-grid .hs-tog { flex: 1 1 calc(50% - 4px); min-width: 80px; }
+    .save-wrap { position: sticky; bottom: 16px; }
+    .delivery-toggle { display: flex; gap: 8px; }
+    .delivery-toggle .hs-tog { flex: 1; }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page" id="mainPage">
+    <div class="hs-empty">
+      <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+      <div class="hs-empty-sub">Loading menu…</div>
+    </div>
+  </main>
+
+  <script src="assets/common.js"></script>
+  <script>
+    const PAY_LABELS = {
+      online: '📱 Online', cash: '💵 Cash', free: '🎁 Free',
+    };
+
+    let menuItems    = [];
+    let qty          = {};
+    let payMode      = 'online';
+    let deliveryType = 'store_pickup';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      HS.setCurrentMela({ MelaId: 'nonmela', MelaName: 'Non-Mela Sales' });
+      HS.renderSidebar('nonmela-log');
+      HS.renderHeader({ title: 'Log Order', subtitle: 'Non-Mela Sales', showMenu: true });
+
+      HS.loading(true, 'Loading menu…');
+      try {
+        const res = await HS.api({ action: 'getMelaMenu', melaId: 'nonmela' });
+        const all = res.data || [];
+        menuItems = all.filter(i => i.Status === 'active');
+        if (!menuItems.length) {
+          document.getElementById('mainPage').innerHTML = `
+            <div class="hs-empty">
+              <div class="hs-empty-icon">🍽️</div>
+              <div class="hs-empty-title">No menu items yet</div>
+              <div class="hs-empty-sub">Set up the Non-Mela menu first.</div>
+              <button class="hs-btn hs-btn-primary hs-mt"
+                onclick="HS.navigate('nonmela-menu.html')">Go to Menu →</button>
+            </div>`;
+          return;
+        }
+        menuItems.forEach(it => { qty[it.ItemKey] = 0; });
+        renderPage();
+      } catch(e) {
+        HS.toast('Could not load menu.', 'error');
+      } finally { HS.loading(false); }
+    });
+
+    function renderPage() {
+      document.getElementById('mainPage').innerHTML = `
+        <div class="hs-card">
+          <div class="hs-card-title">📅 Date</div>
+          <input class="hs-input" type="date" id="orderDate" value="${HS.today()}" />
+        </div>
+
+        <div class="hs-card">
+          <div class="hs-card-title">👤 Customer</div>
+          <div class="hs-field">
+            <label class="hs-label">Name <span class="hs-opt">optional</span></label>
+            <input class="hs-input" type="text" id="custName"
+                   placeholder="Customer name" autocomplete="off" />
+          </div>
+          <div class="hs-field">
+            <label class="hs-label">Phone <span class="hs-opt">optional</span></label>
+            <input class="hs-input" type="tel" id="custPhone"
+                   placeholder="Phone number" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="hs-card">
+          <div class="hs-card-title">🚚 Delivery Type</div>
+          <div class="delivery-toggle">
+            <button class="hs-tog" id="togPickup"   onclick="setDelivery('store_pickup')">🏪 Store Pickup</button>
+            <button class="hs-tog" id="togDelivery" onclick="setDelivery('home_delivery')">🚚 Home Delivery</button>
+          </div>
+        </div>
+
+        <div class="hs-card" id="addressCard" style="display:none;">
+          <div class="hs-card-title">📍 Delivery Address</div>
+          <div class="hs-field">
+            <label class="hs-label">Address Line 1 *</label>
+            <input class="hs-input" type="text" id="addrLine1"
+                   placeholder="House / Flat / Building no." autocomplete="off" />
+          </div>
+          <div class="hs-field">
+            <label class="hs-label">Address Line 2 <span class="hs-opt">optional</span></label>
+            <input class="hs-input" type="text" id="addrLine2"
+                   placeholder="Street / Locality" autocomplete="off" />
+          </div>
+          <div class="hs-field">
+            <label class="hs-label">Area <span class="hs-opt">optional</span></label>
+            <input class="hs-input" type="text" id="addrArea"
+                   placeholder="Area / Neighbourhood" autocomplete="off" />
+          </div>
+          <div class="hs-row" style="gap:8px;">
+            <div class="hs-field" style="flex:1;">
+              <label class="hs-label">City</label>
+              <input class="hs-input" type="text" id="addrCity"
+                     placeholder="City" autocomplete="off" />
+            </div>
+            <div class="hs-field" style="flex:1;">
+              <label class="hs-label">Pincode</label>
+              <input class="hs-input" type="text" id="addrPincode"
+                     placeholder="560001" autocomplete="off" maxlength="6" />
+            </div>
+          </div>
+        </div>
+
+        <div class="hs-card">
+          <div class="hs-card-title">🛒 Items</div>
+          ${menuItems.map(it => `
+            <div class="item-row">
+              <div class="item-info">
+                <div class="item-name">${it.ItemName}</div>
+                <div class="item-price">₹${HS.fmt(it.SellingPrice)} each</div>
+              </div>
+              <div class="hs-qty-ctrl">
+                <button class="hs-qty-btn" onclick="chQty('${it.ItemKey}',-1)">−</button>
+                <span class="hs-qty-num" id="q-${it.ItemKey}">0</span>
+                <button class="hs-qty-btn" onclick="chQty('${it.ItemKey}',1)">+</button>
+              </div>
+            </div>`).join('')}
+        </div>
+
+        <div class="hs-card">
+          <div class="hs-card-title">💳 Payment Mode</div>
+          <div class="pay-grid" id="paymentOptions"></div>
+        </div>
+
+        <div class="save-wrap">
+          <button class="hs-btn-cta inactive" id="saveBtn" onclick="saveOrder()">
+            Nothing selected yet
+          </button>
+        </div>`;
+
+      setDelivery('store_pickup');
+      renderPayment();
+    }
+
+    function setDelivery(type) {
+      deliveryType = type;
+      document.getElementById('togPickup').className   = 'hs-tog' + (type==='store_pickup'   ? ' on-green' : '');
+      document.getElementById('togDelivery').className = 'hs-tog' + (type==='home_delivery'  ? ' on-green' : '');
+      document.getElementById('addressCard').style.display = type === 'home_delivery' ? '' : 'none';
+      updateSaveBtn();
+    }
+
+    function renderPayment() {
+      document.getElementById('paymentOptions').innerHTML =
+        ['online','cash','free'].map(m =>
+          `<button class="hs-tog ${payMode===m?'on-green':''}"
+            onclick="setPay('${m}')">${PAY_LABELS[m]}</button>`
+        ).join('');
+    }
+
+    function setPay(m) { payMode = m; renderPayment(); updateSaveBtn(); }
+
+    function chQty(key, d) {
+      qty[key] = Math.max(0, (qty[key]||0) + d);
+      const el = document.getElementById('q-' + key);
+      if (el) { el.textContent = qty[key]; el.className = 'hs-qty-num' + (qty[key]>0?' active':''); }
+      updateSaveBtn();
+    }
+
+    function calcTotal() {
+      return menuItems.reduce((s, it) => s + it.SellingPrice * (qty[it.ItemKey]||0), 0);
+    }
+
+    function updateSaveBtn() {
+      const total    = calcTotal();
+      const hasItems = menuItems.some(it => (qty[it.ItemKey]||0) > 0);
+      const btn      = document.getElementById('saveBtn');
+      if (!btn) return;
+      if (!hasItems) {
+        btn.textContent = 'Nothing selected yet';
+        btn.className   = 'hs-btn-cta inactive';
+      } else if (payMode === 'free') {
+        btn.textContent = `🎁 Free — ₹${HS.fmt(total)} logged ✓`;
+        btn.className   = 'hs-btn-cta';
+        btn.style.background = 'var(--brown-mid)';
+      } else {
+        btn.textContent = `₹${HS.fmt(total)} — Save Order ✓`;
+        btn.className   = 'hs-btn-cta';
+        btn.style.background = '';
+      }
+    }
+
+    async function saveOrder() {
+      const hasItems = menuItems.some(it => (qty[it.ItemKey]||0) > 0);
+      if (!hasItems) { HS.toast('Select at least one item.', 'error'); return; }
+
+      const date = document.getElementById('orderDate').value;
+      if (!date) { HS.toast('Date is required.', 'error'); return; }
+
+      if (deliveryType === 'home_delivery') {
+        const line1 = document.getElementById('addrLine1').value.trim();
+        if (!line1) { HS.toast('Address Line 1 is required for home delivery.', 'error'); return; }
+      }
+
+      const items = {};
+      menuItems.forEach(it => {
+        if (qty[it.ItemKey] > 0)
+          items[it.ItemKey] = { qty: qty[it.ItemKey], price: it.SellingPrice };
+      });
+
+      const data = {
+        orderId:      'nm_' + Date.now(),
+        timestamp:    new Date().toISOString(),
+        date,
+        customerName: document.getElementById('custName').value.trim(),
+        phone:        document.getElementById('custPhone').value.trim(),
+        deliveryType,
+        addressLine1: deliveryType === 'home_delivery' ? document.getElementById('addrLine1').value.trim() : '',
+        addressLine2: deliveryType === 'home_delivery' ? document.getElementById('addrLine2').value.trim() : '',
+        area:         deliveryType === 'home_delivery' ? document.getElementById('addrArea').value.trim()  : '',
+        city:         deliveryType === 'home_delivery' ? document.getElementById('addrCity').value.trim()  : '',
+        pincode:      deliveryType === 'home_delivery' ? document.getElementById('addrPincode').value.trim() : '',
+        items,
+        totalAmount:  calcTotal(),
+        paymentMode:  payMode,
+      };
+
+      HS.loading(true, 'Saving…');
+      try {
+        const res = await HS.api({ action: 'saveNonMelaOrder', data: JSON.stringify(data) });
+        if (res.success) { HS.toast('✅ Order saved!', 'success'); resetForm(); }
+        else HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    function resetForm() {
+      menuItems.forEach(it => {
+        qty[it.ItemKey] = 0;
+        const el = document.getElementById('q-' + it.ItemKey);
+        if (el) { el.textContent = '0'; el.className = 'hs-qty-num'; }
+      });
+      ['custName','custPhone','addrLine1','addrLine2','addrArea','addrCity','addrPincode']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      setDelivery('store_pickup');
+      setPay('online');
+      updateSaveBtn();
+    }
+  </script>
+</body>
+</html>

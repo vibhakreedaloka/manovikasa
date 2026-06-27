@@ -65,6 +65,34 @@
       color: var(--text-muted); cursor: pointer;
       display: inline-flex; align-items: center; gap: 6px;
     }
+
+    /* ── Non-Mela section ── */
+    .nonmela-section {
+      margin: 20px 0 100px;
+    }
+    .nonmela-heading {
+      font-size: 11px; font-weight: 700; letter-spacing: .8px;
+      color: var(--text-muted); margin-bottom: 10px; padding-left: 2px;
+    }
+    .nonmela-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .nonmela-btn {
+      background: var(--cream-light);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 12px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+      cursor: pointer; text-decoration: none;
+      transition: background .18s, border-color .18s;
+      box-shadow: var(--shadow-sm);
+    }
+    .nonmela-btn:active { background: var(--cream-dark); border-color: var(--gold); }
+    .nonmela-btn-icon  { font-size: 26px; }
+    .nonmela-btn-label { font-size: 13px; font-weight: 700; color: var(--brown); }
   </style>
 </head>
 <body>
@@ -81,6 +109,7 @@
       <div class="hs-spinner" style="margin:0 auto 12px;"></div>
       <div class="hs-empty-sub">Loading melas…</div>
     </div>
+
   </main>
 
   <!-- Archive Link -->
@@ -93,10 +122,6 @@
     style="bottom:88px;">+</button>
 
   <!-- FAB: Add Global Expense -->
-  <button class="hs-fab" onclick="openGlobalExpModal()"
-    aria-label="Add Global Expense"
-    style="bottom:88px;right:auto;left:24px;background:var(--green);font-size:22px;">💸</button>
-
   <!-- Global nav strip -->
   <div id="globalNav" style="
     position:fixed;bottom:0;left:0;right:0;z-index:200;
@@ -104,26 +129,26 @@
     display:flex;justify-content:center;gap:0;
     max-width:540px;margin:0 auto;
   ">
+    <a onclick="enterNonMela('nonmela-log.html')" style="
+      flex:1;display:flex;flex-direction:column;align-items:center;
+      padding:10px 0 12px;font-size:11px;font-weight:700;color:var(--brown-mid);
+      border-right:1px solid var(--border);gap:3px;cursor:pointer;
+    ">
+      <span style="font-size:22px;">🏪</span>Non-Mela
+    </a>
+    <a href="global-expenses.html" style="
+      flex:1;display:flex;flex-direction:column;align-items:center;
+      padding:10px 0 12px;font-size:11px;font-weight:700;color:var(--brown-mid);
+      border-right:1px solid var(--border);gap:3px;cursor:pointer;
+    ">
+      <span style="font-size:22px;">💸</span>Expenses
+    </a>
     <a href="raw-materials.html" style="
-      flex:1;display:flex;flex-direction:column;align-items:center;
-      padding:10px 0 12px;font-size:11px;font-weight:700;color:var(--brown-mid);
-      border-right:1px solid var(--border);gap:3px;
-    ">
-      <span style="font-size:22px;">🧺</span>Raw Materials
-    </a>
-    <a href="recipes.html" style="
-      flex:1;display:flex;flex-direction:column;align-items:center;
-      padding:10px 0 12px;font-size:11px;font-weight:700;color:var(--brown-mid);
-      border-right:1px solid var(--border);gap:3px;
-    ">
-      <span style="font-size:22px;">📋</span>Recipes
-    </a>
-    <a href="raw-materials.html#preparations" style="
       flex:1;display:flex;flex-direction:column;align-items:center;
       padding:10px 0 12px;font-size:11px;font-weight:700;color:var(--brown-mid);
       gap:3px;
     ">
-      <span style="font-size:22px;">🍳</span>Preparations
+      <span style="font-size:22px;">🧺</span>Raw Materials
     </a>
   </div>
 
@@ -384,6 +409,12 @@
     }
 
     init();
+
+    /* ── NON-MELA ENTRY ── */
+    function enterNonMela(page) {
+      HS.setCurrentMela({ MelaId: 'nonmela', MelaName: 'Non-Mela Sales' });
+      HS.navigate(page);
+    }
 
     /* ── GLOBAL EXPENSE ───────────────────── */
     let gExpCats = [];

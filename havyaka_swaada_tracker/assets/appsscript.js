@@ -29,6 +29,17 @@ const RECIPES_HEADERS        = ['RecipeId','ItemKey','RawMaterialId','QtyPerUnit
 const PREP_LOG_SHEET         = 'PreparationLog';
 const MELA_ALLOC_SHEET       = 'MelaAllocations';
 const SALE_DEDUCTIONS_SHEET  = 'SaleDeductions';
+const NON_MELA_ORDERS_SHEET  = 'NonMelaOrders';
+const CAT_RECIPES_SHEET      = 'CategoryRecipes';
+const ITEM_FIXED_SHEET       = 'ItemFixedIngredients';
+const CAT_RECIPES_HEADERS    = ['CategoryRecipeId','Category','RawMaterialId','QtyPerBaseUnit','CreatedAt'];
+const ITEM_FIXED_HEADERS     = ['FixedId','ItemKey','RawMaterialId','QtyPerUnit','CreatedAt'];
+const NON_MELA_ID            = 'nonmela';
+const NON_MELA_ORDERS_HEADERS = [
+  'OrderId','Timestamp','Date','CustomerName','Phone',
+  'AddressLine1','AddressLine2','Area','City','Pincode',
+  'DeliveryType','Items','TotalAmount','PaymentMode','CreatedAt'
+];
 const SALE_DEDUCTIONS_HEADERS = ['DeductionId','TransactionId','MelaId','ItemKey','QtySold','CostOfGoods','SaleDate','CreatedAt'];
 const MELA_ALLOC_HEADERS     = ['AllocationId','MelaId','ItemKey','QtyAllocated','QtyReturnedToStock','QtyDamaged','QtyKeptAtStall','ReturnNote','AllocatedAt','Status'];
 const PREP_STOCK_SHEET       = 'PreparedStock';
@@ -44,10 +55,10 @@ const CATEGORIES_SHEET       = 'Categories';
 const EXPENSE_CATEGORIES_SHEET = 'ExpenseCategories';
 
 const MELAS_HEADERS           = ['MelaId','MelaName','Area','OrganiserName','ContactPerson','ContactPhone','DateFrom','DateTo','Status','CreatedAt'];
-const MENU_ITEMS_HEADERS      = ['ItemKey','ItemName','DefaultPrice','CreatedInMela','CreatedAt','Category'];
-const MELA_MENU_HEADERS       = ['MelaId','ItemKey','SellingPrice','Status','SortOrder','AddedAt'];
+const MENU_ITEMS_HEADERS      = ['ItemKey','ItemName','DefaultPrice','CreatedInMela','CreatedAt','Category','Size','SizeUnit'];
+const MELA_MENU_HEADERS       = ['MelaId','ItemKey','SellingPrice','Status','SortOrder','AddedAt','Size','SizeUnit'];
 const PURCHASES_HEADERS_NEW   = ['TransactionId','Timestamp','Date','CustomerName','Phone','CustomerType','SocialMedia','Items','TotalAmount','PaymentMode'];
-const CATEGORIES_HEADERS      = ['CategoryName'];
+const CATEGORIES_HEADERS      = ['CategoryName','BaseValue','BaseUnit'];
 const EXPENSE_CATEGORIES_HEADERS = ['CategoryName'];
 const EXPENSE_HEADERS         = ['ExpenseId','Date','Category','Amount','Notes','CreatedAt'];
 
@@ -150,6 +161,27 @@ function getMenuItemsSheet(ss) {
   return s;
 }
 
+/* Ensure Categories sheet has BaseValue and BaseUnit columns.
+   Existing rows get BaseValue=1, BaseUnit='' as defaults. */
+function ensureCategoriesHasBaseColumns(ss) {
+  const sheet = getCategoriesSheet(ss);
+  const hdrs  = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  let changed = false;
+  if (!hdrs.includes('BaseValue')) {
+    sheet.getRange(1, hdrs.length+1).setValue('BaseValue').setFontWeight('bold');
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) sheet.getRange(2, hdrs.length+1, lastRow-1, 1).setValue(1);
+    hdrs.push('BaseValue');
+    changed = true;
+  }
+  if (!hdrs.includes('BaseUnit')) {
+    sheet.getRange(1, hdrs.length+1).setValue('BaseUnit').setFontWeight('bold');
+    hdrs.push('BaseUnit');
+    changed = true;
+  }
+  if (changed) cDel('categories');
+}
+
 function getCategoriesSheet(ss) {
   let s = ss.getSheetByName(CATEGORIES_SHEET);
   if (!s) {
@@ -161,6 +193,33 @@ function getCategoriesSheet(ss) {
 }
 
 /* Add Category column to existing MenuItems sheets and populate default items */
+function ensureMenuItemsHasStatus(ss) {
+  const sheet = getMenuItemsSheet(ss);
+  const hdrs  = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  if (hdrs.includes('Status')) return;
+  const stCol = hdrs.length + 1;
+  sheet.getRange(1, stCol).setValue('Status').setFontWeight('bold');
+  // Leave existing rows blank — blank Status = active (treated as non-archived)
+  cDel('menu_items','menu_items_all');
+}
+
+function ensureMenuItemsHasSizeColumns(ss) {
+  const sheet = getMenuItemsSheet(ss);
+  const hdrs  = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  let changed = false;
+  if (!hdrs.includes('Size')) {
+    sheet.getRange(1, hdrs.length + 1).setValue('Size').setFontWeight('bold');
+    hdrs.push('Size');
+    changed = true;
+  }
+  if (!hdrs.includes('SizeUnit')) {
+    sheet.getRange(1, hdrs.length + 1).setValue('SizeUnit').setFontWeight('bold');
+    hdrs.push('SizeUnit');
+    changed = true;
+  }
+  if (changed) cDel('menu_items','menu_items_all');
+}
+
 function ensureMenuItemsHasCategory(ss) {
   const sheet = getMenuItemsSheet(ss);
   const hdrs  = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
@@ -337,6 +396,58 @@ function getSaleDeductionsSheet(ss) {
   return s;
 }
 
+function getNonMelaOrdersSheet(ss) {
+  let s = ss.getSheetByName(NON_MELA_ORDERS_SHEET);
+  if (!s) {
+    s = ss.insertSheet(NON_MELA_ORDERS_SHEET);
+    s.appendRow(NON_MELA_ORDERS_HEADERS);
+    styleHeader(s, NON_MELA_ORDERS_HEADERS.length);
+  }
+  return s;
+}
+
+/* Ensure CategoryRecipes sheet has BaseValue column between BaseUnit and CreatedAt.
+   Existing rows get BaseValue = 1 (safe default meaning "per 1 unit"). */
+function ensureCatRecipesHasBaseValue(ss) {
+  const sheet = getCatRecipesSheet(ss);
+  const hdrs  = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  if (hdrs.includes('BaseValue')) return; // already present
+
+  // Find position of CreatedAt — insert BaseValue before it
+  const createdAtIdx = hdrs.indexOf('CreatedAt');
+  const insertCol    = createdAtIdx >= 0 ? createdAtIdx + 1 : hdrs.length + 1;
+
+  sheet.insertColumnBefore(insertCol);
+  sheet.getRange(1, insertCol).setValue('BaseValue').setFontWeight('bold');
+
+  // Set default BaseValue = 1 for all existing rows
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, insertCol, lastRow - 1, 1).setValue(1);
+  }
+  cDel('cat_recipes_all');
+}
+
+function getCatRecipesSheet(ss) {
+  let s = ss.getSheetByName(CAT_RECIPES_SHEET);
+  if (!s) {
+    s = ss.insertSheet(CAT_RECIPES_SHEET);
+    s.appendRow(CAT_RECIPES_HEADERS);
+    styleHeader(s, CAT_RECIPES_HEADERS.length);
+  }
+  return s;
+}
+
+function getItemFixedSheet(ss) {
+  let s = ss.getSheetByName(ITEM_FIXED_SHEET);
+  if (!s) {
+    s = ss.insertSheet(ITEM_FIXED_SHEET);
+    s.appendRow(ITEM_FIXED_HEADERS);
+    styleHeader(s, ITEM_FIXED_HEADERS.length);
+  }
+  return s;
+}
+
 /* Compute weighted average cost per unit for a raw material
    based on all purchase history. Returns 0 if no purchases. */
 function weightedAvgCost(ss, rawMaterialId) {
@@ -347,16 +458,54 @@ function weightedAvgCost(ss, rawMaterialId) {
   return totalQty > 0 ? totalCost / totalQty : 0;
 }
 
-/* Compute cost of goods for one sale line:
-   { itemKey, qtySold } → total ingredient cost */
+/* Compute cost of goods for one sale line using the new two-layer recipe system.
+   Layer 1: Category scalable ingredients (QtyPerBaseUnit × item size)
+   Layer 2: Item fixed ingredients (QtyPerUnit per unit sold, e.g. box, stickers) */
 function computeCOGS(ss, itemKey, qtySold) {
-  const recipe = getRecipeMap(ss, itemKey);
-  if (!Object.keys(recipe).length) return 0;
-  let cost = 0;
-  Object.entries(recipe).forEach(([rmId, qtyPerUnit]) => {
-    cost += weightedAvgCost(ss, rmId) * qtyPerUnit * qtySold;
+  if (qtySold <= 0) return 0;
+
+  // Ensure size columns exist
+  ensureMenuItemsHasSizeColumns(ss);
+
+  // Get item details (size, sizeUnit, category) from global menu items sheet
+  const menuRows  = sheetToObjects(getMenuItemsSheet(ss));
+  const menuItem  = menuRows.find(r => r.ItemKey === itemKey);
+  if (!menuItem) return 0;
+
+  const category = menuItem.Category || '';
+  const size     = Number(menuItem.Size     || 0);
+  const sizeUnit = (menuItem.SizeUnit || '').toLowerCase().trim();
+
+  let costPerUnit = 0;
+
+  // Layer 1: scalable ingredients from CategoryRecipes
+  // BaseValue and BaseUnit now live in the Categories sheet (one per category)
+  if (category && size > 0) {
+    ensureCategoriesHasBaseColumns(ss);
+    const catRows  = sheetToObjects(getCategoriesSheet(ss));
+    const catRow   = catRows.find(r => r.CategoryName === category);
+    const baseValue = Number(catRow?.BaseValue) || 1;
+    const baseUnit  = (catRow?.BaseUnit || '').toLowerCase().trim();
+
+    const catRecipes = sheetToObjects(getCatRecipesSheet(ss))
+      .filter(r => r.Category === category);
+    catRecipes.forEach(r => {
+      // Units must match, or either is empty (lenient matching)
+      if (baseUnit === sizeUnit || baseUnit === '' || sizeUnit === '') {
+        const qtyNeeded = Number(r.QtyPerBaseUnit) * (size / baseValue);
+        costPerUnit += weightedAvgCost(ss, r.RawMaterialId) * qtyNeeded;
+      }
+    });
+  }
+
+  // Layer 2: fixed ingredients from ItemFixedIngredients
+  const fixedLines = sheetToObjects(getItemFixedSheet(ss))
+    .filter(r => r.ItemKey === itemKey);
+  fixedLines.forEach(r => {
+    costPerUnit += weightedAvgCost(ss, r.RawMaterialId) * Number(r.QtyPerUnit);
   });
-  return cost;
+
+  return costPerUnit * qtySold;
 }
 
 /* Write SaleDeduction rows for a transaction's items.
@@ -443,18 +592,38 @@ function doGet(e) {
       case 'deleteGlobalExpense':  return handleDeleteExpense(ss,{...e, parameter: {...e.parameter, melaId:'global'}});
       case 'getCategories':        return handleGetCategories(ss);
       case 'addCategory':         return handleAddCategory(ss,e);
+      case 'updateCategoryBase':  return handleUpdateCategoryBase(ss,e);
       case 'getMenuItems':        return handleGetMenuItems(ss,e);
       case 'getMelaMenu':         return handleGetMelaMenu(ss,e);
       case 'addToMelaMenu':       return handleAddToMelaMenu(ss,e);
       case 'createMenuItem':      return handleCreateMenuItem(ss,e);
+      case 'updateGlobalMenuItem': return handleUpdateGlobalMenuItem(ss,e);
+      case 'archiveGlobalMenuItem':return handleArchiveGlobalMenuItem(ss,e);
+      case 'addGlobalMenuItem':    return handleAddGlobalMenuItem(ss,e);
       case 'updateMelaMenuItem':  return handleUpdateMelaMenuItem(ss,e);
       case 'archiveMelaMenuItem': return handleSetMenuStatus(ss,e,'archived');
       case 'restoreMelaMenuItem': return handleSetMenuStatus(ss,e,'active');
       case 'reorderMelaMenu':     return handleReorderMelaMenu(ss,e);
       case 'save':                return handleSavePurchase(ss,e);
+      // ── Category Recipes & Fixed Ingredients ──
+      case 'getCategoryRecipes':      return handleGetCategoryRecipes(ss,e);
+      case 'saveCategoryRecipe':      return handleSaveCategoryRecipe(ss,e);
+      case 'deleteCategoryRecipe':    return handleDeleteCategoryRecipe(ss,e);
+      case 'getItemFixedIngredients': return handleGetItemFixedIngredients(ss,e);
+      case 'saveItemFixedIngredient': return handleSaveItemFixedIngredient(ss,e);
+      case 'deleteItemFixedIngredient': return handleDeleteItemFixedIngredient(ss,e);
+      case 'clearRecipesSheet':       return handleClearRecipesSheet(ss,e);
+      case 'updateMenuItemSize':      return handleUpdateMenuItemSize(ss,e);
+      // ── Non-Mela Orders ──
+      case 'getNonMelaOrders':    return handleGetNonMelaOrders(ss,e);
+      case 'saveNonMelaOrder':    return handleSaveNonMelaOrder(ss,e);
+      case 'updateNonMelaOrder':  return handleUpdateNonMelaOrder(ss,e);
+      case 'deleteNonMelaOrder':  return handleDeleteNonMelaOrder(ss,e);
       case 'updateTransaction':   return handleUpdateTransaction(ss,e);
       case 'deleteTransaction':   return handleDeleteTransaction(ss,e);
       case 'getSaleDeductions':   return handleGetSaleDeductions(ss,e);
+      case 'recalcCOGS':          return handleRecalcCOGS(ss,e);
+      case 'debugCOGS':           return handleDebugCOGS(ss,e);
       // ── Mela Allocations ──
       case 'getMelaAllocations':    return handleGetMelaAllocations(ss,e);
       case 'addMelaAllocation':     return handleAddMelaAllocation(ss,e);
@@ -543,27 +712,61 @@ function appendMelaMenuRow(sheet, data) {
    MENU HANDLERS
 ═══════════════════════════════════════ */
 function handleGetCategories(ss) {
+  ensureCategoriesHasBaseColumns(ss);
   const sheet = getCategoriesSheet(ss);
   const data  = sheetToObjects(sheet);
+  // Return both simple list and full objects
   const cats  = data.map(r => r.CategoryName).filter(Boolean);
-  return ok({ data: cats });
+  const full  = data.filter(r => r.CategoryName).map(r => ({
+    name:      r.CategoryName,
+    baseValue: Number(r.BaseValue) || 1,
+    baseUnit:  r.BaseUnit || '',
+  }));
+  return ok({ data: cats, categories: full });
 }
 
 function handleAddCategory(ss, e) {
+  ensureCategoriesHasBaseColumns(ss);
   const name = e.parameter.name;
   if (!name) return ok({ success: false, error: 'Category name required' });
-  getCategoriesSheet(ss).appendRow([name]);
+  getCategoriesSheet(ss).appendRow([name, 1, '']);
+  cDel('categories');
   return ok({ success: true });
+}
+
+/* Update BaseValue and BaseUnit for a category */
+function handleUpdateCategoryBase(ss, e) {
+  ensureCategoriesHasBaseColumns(ss);
+  const sheet = getCategoriesSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const nmCol = hdrs.indexOf('CategoryName');
+  const bvCol = hdrs.indexOf('BaseValue');
+  const buCol = hdrs.indexOf('BaseUnit');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][nmCol] === e.parameter.category) {
+      if (bvCol >= 0) sheet.getRange(i+1, bvCol+1).setValue(Number(e.parameter.baseValue)||1);
+      if (buCol >= 0) sheet.getRange(i+1, buCol+1).setValue(e.parameter.baseUnit||'');
+      cDel('categories');
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Category not found' });
 }
 
 function handleGetMenuItems(ss, e) {
   ensureMenuItemsHasCategory(ss);
+  ensureMenuItemsHasStatus(ss);
+  ensureMenuItemsHasSizeColumns(ss);
+  const includeArchived = e.parameter.includeArchived === '1';
+  const cKey = includeArchived ? 'menu_items_all' : 'menu_items';
   if (e.parameter.noCache !== '1') {
-    const hit = cGet('menu_items');
+    const hit = cGet(cKey);
     if (hit) return ok({data:hit});
   }
-  const data = sheetToObjects(getMenuItemsSheet(ss));
-  cPut('menu_items',data);
+  let data = sheetToObjects(getMenuItemsSheet(ss));
+  if (!includeArchived) data = data.filter(r => r.Status !== 'archived');
+  cPut(cKey, data);
   return ok({data});
 }
 
@@ -600,10 +803,17 @@ function handleAddToMelaMenu(ss,e) {
   const now=new Date().toISOString();
   const melaRows=existing.filter(r=>r.MelaId===d.melaId);
   let nextOrder=melaRows.length ? Math.max(...melaRows.map(r=>Number(r.SortOrder||0)))+1 : 1;
+  // Load global menu items to copy Size/SizeUnit
+  const globalItems=sheetToObjects(getMenuItemsSheet(ss));
+  const globalMap={};
+  globalItems.forEach(it=>{ globalMap[it.ItemKey]=it; });
   d.items.forEach(item=>{
-    if(!existing.find(r=>r.MelaId===d.melaId&&r.ItemKey===item.itemKey))
+    if(!existing.find(r=>r.MelaId===d.melaId&&r.ItemKey===item.itemKey)) {
+      const g=globalMap[item.itemKey]||{};
       appendMelaMenuRow(sheet,{MelaId:d.melaId,ItemKey:item.itemKey,
-        SellingPrice:item.sellingPrice,Status:'active',SortOrder:nextOrder++,AddedAt:now});
+        SellingPrice:item.sellingPrice,Status:'active',SortOrder:nextOrder++,AddedAt:now,
+        Size:Number(g.Size)||0, SizeUnit:g.SizeUnit||''});
+    }
   });
   cDel('mela_menu_'+d.melaId);
   return ok({success:true});
@@ -611,13 +821,109 @@ function handleAddToMelaMenu(ss,e) {
 
 function handleCreateMenuItem(ss,e) {
   const d=JSON.parse(e.parameter.data), itemKey='item_'+Date.now(), now=new Date().toISOString();
-  getMenuItemsSheet(ss).appendRow([itemKey, d.name, d.price, d.melaId, now, d.category||'']);
+  const size=Number(d.size)||0, sizeUnit=d.sizeUnit||'';
+  getMenuItemsSheet(ss).appendRow([itemKey, d.name, d.price, d.melaId, now, d.category||'', size, sizeUnit]);
   const mmSheet=getMelaMenuSheet(ss), existing=sheetToObjects(mmSheet).filter(r=>r.MelaId===d.melaId);
   const nextOrder=existing.length ? Math.max(...existing.map(r=>Number(r.SortOrder||0)))+1 : 1;
   appendMelaMenuRow(mmSheet,{MelaId:d.melaId,ItemKey:itemKey,
-    SellingPrice:d.price,Status:'active',SortOrder:nextOrder,AddedAt:now});
+    SellingPrice:d.price,Status:'active',SortOrder:nextOrder,AddedAt:now,Size:size,SizeUnit:sizeUnit});
   cDel('menu_items','mela_menu_'+d.melaId);
   return ok({success:true,itemKey});
+}
+
+/* Add a standalone global menu item (not tied to a specific mela at creation) */
+function handleAddGlobalMenuItem(ss, e) {
+  const d        = JSON.parse(e.parameter.data);
+  const itemKey  = 'item_' + Date.now();
+  const now      = new Date().toISOString();
+  const size     = Number(d.size)     || 0;
+  const sizeUnit = d.sizeUnit         || '';
+  getMenuItemsSheet(ss).appendRow([
+    itemKey, d.name, Number(d.price)||0,
+    'global', // CreatedInMela — 'global' means not tied to a mela
+    now, d.category||'', size, sizeUnit,
+  ]);
+  cDel('menu_items');
+  return ok({ success: true, itemKey });
+}
+
+/* Update name, price, category, size, sizeUnit on a global menu item */
+function handleUpdateGlobalMenuItem(ss, e) {
+  const d = JSON.parse(e.parameter.data);
+  // Ensure size columns exist FIRST
+  ensureMenuItemsHasSizeColumns(ss);
+  const sheet = getMenuItemsSheet(ss);
+  // Fresh read AFTER columns are ensured
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+
+  // Log column indices for debugging
+  const ikCol  = hdrs.indexOf('ItemKey');
+  const nmCol  = hdrs.indexOf('ItemName');
+  const prCol  = hdrs.indexOf('DefaultPrice');
+  const catCol = hdrs.indexOf('Category');
+  const szCol  = hdrs.indexOf('Size');
+  const suCol  = hdrs.indexOf('SizeUnit');
+
+  if (szCol < 0) return ok({ success: false, error: 'Size column not found after ensure. Indices: ' + JSON.stringify(hdrs) });
+  if (suCol < 0) return ok({ success: false, error: 'SizeUnit column not found after ensure.' });
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][ikCol]) !== String(d.itemKey)) continue;
+    if (nmCol  >= 0) sheet.getRange(i+1, nmCol +1).setValue(d.name       || rows[i][nmCol]);
+    if (prCol  >= 0) sheet.getRange(i+1, prCol +1).setValue(Number(d.price)  || 0);
+    if (catCol >= 0) sheet.getRange(i+1, catCol+1).setValue(d.category   || '');
+    sheet.getRange(i+1, szCol+1).setValue(Number(d.size) || 0);
+    sheet.getRange(i+1, suCol+1).setValue(d.sizeUnit || '');
+    // Propagate to mela menu rows
+    adjustMenuItemSizeInMelaMenu(ss, d.itemKey, Number(d.size)||0, d.sizeUnit||'');
+    cDel('menu_items', 'menu_items_all');
+    return ok({ success: true });
+  }
+  return ok({ success: false, error: 'Item not found: ' + d.itemKey });
+}
+
+/* Archive or restore a global menu item */
+function handleArchiveGlobalMenuItem(ss, e) {
+  ensureMenuItemsHasStatus(ss);
+  const sheet   = getMenuItemsSheet(ss);
+  const rows    = sheet.getDataRange().getValues();
+  const hdrs    = rows[0];
+  const ikCol   = hdrs.indexOf('ItemKey');
+  // Status column — add it if missing
+  let stCol = hdrs.indexOf('Status');
+  if (stCol < 0) {
+    sheet.getRange(1, hdrs.length + 1).setValue('Status');
+    stCol = hdrs.length;
+    hdrs.push('Status');
+  }
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][ikCol] !== e.parameter.itemKey) continue;
+    sheet.getRange(i + 1, stCol + 1).setValue(e.parameter.status || 'archived');
+    cDel('menu_items');
+    return ok({ success: true });
+  }
+  return ok({ success: false, error: 'Item not found' });
+}
+
+/* Helper: propagate Size/SizeUnit changes to MelaMenu rows */
+function adjustMenuItemSizeInMelaMenu(ss, itemKey, size, sizeUnit) {
+  const mmSheet = getMelaMenuSheet(ss);
+  const rows    = mmSheet.getDataRange().getValues();
+  const hdrs    = rows[0];
+  const ikCol   = hdrs.indexOf('ItemKey');
+  let szCol  = hdrs.indexOf('Size');
+  let suCol  = hdrs.indexOf('SizeUnit');
+  if (szCol < 0) { mmSheet.getRange(1, hdrs.length+1).setValue('Size');     szCol = hdrs.length;   hdrs.push('Size'); }
+  if (suCol < 0) { mmSheet.getRange(1, hdrs.length+1).setValue('SizeUnit'); suCol = hdrs.length; hdrs.push('SizeUnit'); }
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][ikCol] !== itemKey) continue;
+    mmSheet.getRange(i+1, szCol+1).setValue(size);
+    mmSheet.getRange(i+1, suCol+1).setValue(sizeUnit);
+  }
+  // Invalidate all mela menu caches
+  const melaIds = [...new Set(rows.slice(1).map(r => r[hdrs.indexOf('MelaId')]).filter(Boolean))];
+  melaIds.forEach(id => cDel('mela_menu_' + id));
 }
 
 function handleUpdateMelaMenuItem(ss,e) {
@@ -850,6 +1156,363 @@ function handleUpdatePaymentMode(ss,e) {
   if(!pmCol) return ok({success:false,error:'PaymentMode column not found'});
   sheet.getRange(rowIndex,pmCol).setValue(newMode);
   return ok({success:true});
+}
+
+/* ═══════════════════════════════════════
+   CATEGORY RECIPE & FIXED INGREDIENT HANDLERS
+═══════════════════════════════════════ */
+
+function handleGetCategoryRecipes(ss, e) {
+  ensureCatRecipesHasBaseValue(ss);
+  const category = e.parameter.category || null;
+  const cKey     = category ? 'cat_recipes_' + category : 'cat_recipes_all';
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  let data = sheetToObjects(getCatRecipesSheet(ss));
+  if (category) data = data.filter(r => r.Category === category);
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+function handleSaveCategoryRecipe(ss, e) {
+  ensureCatRecipesHasBaseValue(ss);
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getCatRecipesSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol = hdrs.indexOf('CategoryRecipeId');
+  const now   = new Date().toISOString();
+
+  if (d.categoryRecipeId) {
+    // Update existing
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][idCol] === d.categoryRecipeId) {
+        const set = (col, val) => { const c=hdrs.indexOf(col); if(c>=0) sheet.getRange(i+1,c+1).setValue(val); };
+        set('QtyPerBaseUnit', Number(d.qtyPerBaseUnit));
+        cDel('cat_recipes_all', 'cat_recipes_' + d.category);
+        return ok({ success: true });
+      }
+    }
+    return ok({ success: false, error: 'Recipe line not found' });
+  }
+
+  // Check duplicate (same category + rawMaterialId)
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][hdrs.indexOf('Category')]       === d.category &&
+        rows[i][hdrs.indexOf('RawMaterialId')]  === d.rawMaterialId) {
+      return ok({ success: false, error: 'This ingredient is already in the category recipe. Edit the existing line instead.' });
+    }
+  }
+
+  const id = 'cr_' + Date.now();
+  sheet.appendRow([id, d.category, d.rawMaterialId, Number(d.qtyPerBaseUnit), d.baseUnit||'', Number(d.baseValue)||1, now]);
+  cDel('cat_recipes_all', 'cat_recipes_' + d.category);
+  return ok({ success: true, categoryRecipeId: id });
+}
+
+function handleDeleteCategoryRecipe(ss, e) {
+  const sheet = getCatRecipesSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol = hdrs.indexOf('CategoryRecipeId');
+  const catCol= hdrs.indexOf('Category');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === e.parameter.categoryRecipeId) {
+      const cat = rows[i][catCol];
+      sheet.deleteRow(i + 1);
+      cDel('cat_recipes_all', 'cat_recipes_' + cat);
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Recipe line not found' });
+}
+
+function handleGetItemFixedIngredients(ss, e) {
+  const itemKey = e.parameter.itemKey || null;
+  const cKey    = itemKey ? 'item_fixed_' + itemKey : 'item_fixed_all';
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  let data = sheetToObjects(getItemFixedSheet(ss));
+  if (itemKey) data = data.filter(r => r.ItemKey === itemKey);
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+function handleSaveItemFixedIngredient(ss, e) {
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getItemFixedSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol = hdrs.indexOf('FixedId');
+  const now   = new Date().toISOString();
+
+  if (d.fixedId) {
+    // Update qty
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][idCol] === d.fixedId) {
+        const qtyCol = hdrs.indexOf('QtyPerUnit');
+        if (qtyCol >= 0) sheet.getRange(i+1, qtyCol+1).setValue(Number(d.qtyPerUnit));
+        cDel('item_fixed_all', 'item_fixed_' + d.itemKey);
+        return ok({ success: true });
+      }
+    }
+    return ok({ success: false, error: 'Fixed ingredient not found' });
+  }
+
+  // Check duplicate
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][hdrs.indexOf('ItemKey')]       === d.itemKey &&
+        rows[i][hdrs.indexOf('RawMaterialId')] === d.rawMaterialId) {
+      return ok({ success: false, error: 'This raw material is already a fixed ingredient for this item.' });
+    }
+  }
+
+  const id = 'fi_' + Date.now();
+  sheet.appendRow([id, d.itemKey, d.rawMaterialId, Number(d.qtyPerUnit), now]);
+  cDel('item_fixed_all', 'item_fixed_' + d.itemKey);
+  return ok({ success: true, fixedId: id });
+}
+
+function handleDeleteItemFixedIngredient(ss, e) {
+  const sheet  = getItemFixedSheet(ss);
+  const rows   = sheet.getDataRange().getValues();
+  const hdrs   = rows[0];
+  const idCol  = hdrs.indexOf('FixedId');
+  const ikCol  = hdrs.indexOf('ItemKey');
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] === e.parameter.fixedId) {
+      const itemKey = rows[i][ikCol];
+      sheet.deleteRow(i + 1);
+      cDel('item_fixed_all', 'item_fixed_' + itemKey);
+      return ok({ success: true });
+    }
+  }
+  return ok({ success: false, error: 'Fixed ingredient not found' });
+}
+
+/* One-time migration: clear all data from old Recipes sheet */
+function handleClearRecipesSheet(ss, e) {
+  const sheet = ss.getSheetByName('Recipes');
+  if (!sheet) return ok({ success: true, message: 'Recipes sheet not found — nothing to clear' });
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.deleteRows(2, lastRow - 1);
+  }
+  cDel('recipes_all');
+  return ok({ success: true });
+}
+
+/* Update Size and SizeUnit on both global menu item and mela menu rows */
+function handleUpdateMenuItemSize(ss, e) {
+  const d        = JSON.parse(e.parameter.data);
+  const size     = Number(d.size) || 0;
+  const sizeUnit = d.sizeUnit || '';
+
+  // Ensure columns exist FIRST, then re-read headers fresh
+  ensureMenuItemsHasSizeColumns(ss);
+
+  const miSheet = getMenuItemsSheet(ss);
+  // Re-read AFTER ensuring columns exist
+  const miRows  = miSheet.getDataRange().getValues();
+  const miHdrs  = miRows[0];
+  const miIkCol = miHdrs.indexOf('ItemKey');
+  const miSzCol = miHdrs.indexOf('Size');
+  const miSuCol = miHdrs.indexOf('SizeUnit');
+
+  if (miSzCol < 0) return ok({ success: false, error: 'Size column missing after ensure — check sheet permissions' });
+
+  for (let i = 1; i < miRows.length; i++) {
+    if (String(miRows[i][miIkCol]) === String(d.itemKey)) {
+      miSheet.getRange(i+1, miSzCol+1).setValue(size);
+      miSheet.getRange(i+1, miSuCol+1).setValue(sizeUnit);
+      break;
+    }
+  }
+
+  // Update all mela menu rows for this ItemKey
+  adjustMenuItemSizeInMelaMenu(ss, d.itemKey, size, sizeUnit);
+
+  cDel('menu_items', 'menu_items_all', 'mela_menu_all');
+  return ok({ success: true });
+}
+
+/* ═══════════════════════════════════════
+   NON-MELA ORDER HANDLERS
+═══════════════════════════════════════ */
+
+function handleGetNonMelaOrders(ss, e) {
+  const cKey = 'nonmela_orders';
+  if (e.parameter.noCache !== '1') {
+    const hit = cGet(cKey);
+    if (hit) return ok({ data: hit });
+  }
+  const data = sheetToObjects(getNonMelaOrdersSheet(ss));
+  data.sort((a, b) => (b.Date || '').localeCompare(a.Date || ''));
+  cPut(cKey, data);
+  return ok({ data });
+}
+
+function handleSaveNonMelaOrder(ss, e) {
+  const d       = JSON.parse(e.parameter.data);
+  const orderId = d.orderId || ('nm_' + Date.now());
+  const now     = new Date().toISOString();
+
+  // Only store address fields for home delivery
+  const isDelivery = d.deliveryType === 'home_delivery';
+
+  getNonMelaOrdersSheet(ss).appendRow([
+    orderId,
+    d.timestamp || now,
+    d.date || '',
+    d.customerName || '',
+    d.phone || '',
+    isDelivery ? (d.addressLine1 || '') : '',
+    isDelivery ? (d.addressLine2 || '') : '',
+    isDelivery ? (d.area || '')         : '',
+    isDelivery ? (d.city || '')         : '',
+    isDelivery ? (d.pincode || '')      : '',
+    d.deliveryType || 'store_pickup',
+    JSON.stringify(d.items || {}),
+    Number(d.totalAmount) || 0,
+    d.paymentMode || 'cash',
+    now,
+  ]);
+
+  // Deduct from PreparedStock (same as mela sales)
+  // Free orders still deduct — ingredients consumed regardless of payment
+  writeSaleDeductions(ss, orderId, NON_MELA_ID, d.items || {}, d.date);
+
+  cDel('nonmela_orders', 'sale_ded_' + NON_MELA_ID);
+  return ok({ success: true, orderId });
+}
+
+function handleUpdateNonMelaOrder(ss, e) {
+  const d     = JSON.parse(e.parameter.data);
+  const sheet = getNonMelaOrdersSheet(ss);
+  const rows  = sheet.getDataRange().getValues();
+  const hdrs  = rows[0];
+  const idCol = hdrs.indexOf('OrderId');
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] !== d.orderId) continue;
+
+    const isDelivery = d.deliveryType === 'home_delivery';
+    const set = (col, val) => {
+      const c = hdrs.indexOf(col);
+      if (c >= 0) sheet.getRange(i + 1, c + 1).setValue(val);
+    };
+
+    set('Date',         d.date          || '');
+    set('CustomerName', d.customerName   || '');
+    set('Phone',        d.phone          || '');
+    set('AddressLine1', isDelivery ? (d.addressLine1 || '') : '');
+    set('AddressLine2', isDelivery ? (d.addressLine2 || '') : '');
+    set('Area',         isDelivery ? (d.area         || '') : '');
+    set('City',         isDelivery ? (d.city         || '') : '');
+    set('Pincode',      isDelivery ? (d.pincode      || '') : '');
+    set('DeliveryType', d.deliveryType  || 'store_pickup');
+    set('Items',        JSON.stringify(d.items || {}));
+    set('TotalAmount',  Number(d.totalAmount) || 0);
+    set('PaymentMode',  d.paymentMode   || 'cash');
+
+    // Reverse old deductions, write new ones
+    deleteSaleDeductions(ss, d.orderId);
+    writeSaleDeductions(ss, d.orderId, NON_MELA_ID, d.items || {}, d.date);
+
+    cDel('nonmela_orders', 'sale_ded_' + NON_MELA_ID);
+    return ok({ success: true });
+  }
+  return ok({ success: false, error: 'Order not found' });
+}
+
+function handleDeleteNonMelaOrder(ss, e) {
+  const sheet  = getNonMelaOrdersSheet(ss);
+  const rows   = sheet.getDataRange().getValues();
+  const hdrs   = rows[0];
+  const idCol  = hdrs.indexOf('OrderId');
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idCol] !== e.parameter.orderId) continue;
+    deleteSaleDeductions(ss, e.parameter.orderId);
+    sheet.deleteRow(i + 1);
+    cDel('nonmela_orders', 'sale_ded_' + NON_MELA_ID);
+    return ok({ success: true });
+  }
+  return ok({ success: false, error: 'Order not found' });
+}
+
+/* Debug: returns what computeCOGS sees for a given itemKey */
+function handleDebugCOGS(ss, e) {
+  const itemKey = e.parameter.itemKey;
+  ensureMenuItemsHasSizeColumns(ss);
+  const menuRows = sheetToObjects(getMenuItemsSheet(ss));
+  const menuItem = menuRows.find(r => r.ItemKey === itemKey);
+  if (!menuItem) return ok({ error: 'Item not found', itemKey });
+
+  const catRecipes = sheetToObjects(getCatRecipesSheet(ss))
+    .filter(r => r.Category === menuItem.Category);
+  const fixedLines = sheetToObjects(getItemFixedSheet(ss))
+    .filter(r => r.ItemKey === itemKey);
+
+  return ok({
+    itemKey,
+    itemName:   menuItem.ItemName,
+    category:   menuItem.Category,
+    size:       menuItem.Size,
+    sizeUnit:   menuItem.SizeUnit,
+    catRecipes: catRecipes.map(r => ({
+      rawMaterialId: r.RawMaterialId,
+      qtyPerBaseUnit: r.QtyPerBaseUnit,
+      baseUnit: r.BaseUnit,
+      baseValue: r.BaseValue,
+      avgCost: weightedAvgCost(ss, r.RawMaterialId),
+    })),
+    fixedLines: fixedLines.map(r => ({
+      rawMaterialId: r.RawMaterialId,
+      qtyPerUnit: r.QtyPerUnit,
+      avgCost: weightedAvgCost(ss, r.RawMaterialId),
+    })),
+    computedCOGS: computeCOGS(ss, itemKey, 1),
+  });
+}
+
+/* Recalculate COGS for all SaleDeduction rows in a mela.
+   Called when recipes/sizes are updated after sales were already logged.
+   Rewrites CostOfGoods in-place for every deduction row matching melaId. */
+function handleRecalcCOGS(ss, e) {
+  const melaId = e.parameter.melaId;
+  if (!melaId) return ok({ success: false, error: 'melaId required' });
+
+  // Ensure size columns exist before reading
+  ensureMenuItemsHasSizeColumns(ss);
+
+  const sheet  = getSaleDeductionsSheet(ss);
+  const rows   = sheet.getDataRange().getValues();
+  const hdrs   = rows[0];
+  const mCol   = hdrs.indexOf('MelaId');
+  const ikCol  = hdrs.indexOf('ItemKey');
+  const qCol   = hdrs.indexOf('QtySold');
+  const cgCol  = hdrs.indexOf('CostOfGoods');
+
+  if (cgCol < 0) return ok({ success: false, error: 'CostOfGoods column not found' });
+
+  let updated = 0;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][mCol] !== melaId) continue;
+    const itemKey = rows[i][ikCol];
+    const qtySold = Number(rows[i][qCol]) || 0;
+    if (!itemKey || qtySold <= 0) continue;
+    const newCOGS = computeCOGS(ss, itemKey, qtySold);
+    sheet.getRange(i + 1, cgCol + 1).setValue(newCOGS);
+    updated++;
+  }
+
+  cDel('sale_ded_' + melaId);
+  return ok({ success: true, updated });
 }
 
 /* ═══════════════════════════════════════

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Orders — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+    .filter-chip {
+      padding: 5px 13px; border-radius: 20px; border: 2px solid var(--border);
+      background: var(--cream); color: var(--brown-mid);
+      font-family: 'Nunito',sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    }
+    .filter-chip.on { background: var(--brown); border-color: var(--brown); color: #fff; }
+
+    .order-card {
+      background: var(--cream-light); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 13px 14px;
+      margin-bottom: 10px; box-shadow: var(--shadow-sm);
+    }
+    .order-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+    .order-date { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    .order-badges { display: flex; gap: 6px; align-items: center; }
+    .del-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .del-badge.home_delivery { background: rgba(61,99,56,.12);  color: var(--green); }
+    .del-badge.store_pickup  { background: rgba(196,132,26,.12); color: var(--gold); }
+    .pay-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .pay-badge.cash   { background: rgba(61,99,56,.15);  color: var(--green); }
+    .pay-badge.online { background: rgba(196,132,26,.15); color: var(--gold); }
+    .pay-badge.free   { background: rgba(0,0,0,.07);      color: var(--text-muted); }
+    .order-customer { font-size: 13px; font-weight: 600; color: var(--brown-dark); margin-bottom: 3px; }
+    .order-address  { font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; line-height: 1.5; }
+    .order-items    { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 6px; }
+    .order-footer   { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .order-amount   { font-family:'Playfair Display',serif; font-size:16px; color:var(--brown); }
+    .order-amount.free { color: var(--text-muted); text-decoration: line-through; font-size:14px; }
+    .order-actions  { display: flex; gap: 6px; }
+    .order-action-btn {
+      width: 30px; height: 30px; border-radius: 7px; border: none;
+      font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .order-action-btn:active { filter: brightness(.85); }
+
+    /* Edit modal */
+    .item-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+    .item-row:last-child { border-bottom: none; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name  { font-size: 14px; font-weight: 700; color: var(--brown); }
+    .item-price { font-size: 12px; color: var(--gold); font-weight: 600; margin-top: 2px; }
+    .pay-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pay-grid .hs-tog { flex: 1 1 calc(50% - 4px); min-width: 80px; }
+    .delivery-toggle { display: flex; gap: 8px; margin-bottom: 4px; }
+    .delivery-toggle .hs-tog { flex: 1; }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page" id="mainPage">
+    <div class="hs-empty">
+      <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+      <div class="hs-empty-sub">Loading orders…</div>
+    </div>
+  </main>
+
+  <!-- ══ EDIT ORDER MODAL ══ -->
+  <div class="hs-modal-bg" id="editModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title">Edit Order</div>
+      <input type="hidden" id="editOrderId" />
+
+      <div class="hs-card" style="margin-bottom:10px;">
+        <div class="hs-card-title">📅 Date</div>
+        <input class="hs-input" type="date" id="editDate" />
+      </div>
+
+      <div class="hs-card" style="margin-bottom:10px;">
+        <div class="hs-card-title">👤 Customer</div>
+        <div class="hs-field">
+          <label class="hs-label">Name <span class="hs-opt">optional</span></label>
+          <input class="hs-input" type="text" id="editCustName" placeholder="Customer name" autocomplete="off" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Phone <span class="hs-opt">optional</span></label>
+          <input class="hs-input" type="tel" id="editCustPhone" placeholder="Phone number" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="hs-card" style="margin-bottom:10px;">
+        <div class="hs-card-title">🚚 Delivery Type</div>
+        <div class="delivery-toggle">
+          <button class="hs-tog" id="editTogPickup"   onclick="editSetDelivery('store_pickup')">🏪 Store Pickup</button>
+          <button class="hs-tog" id="editTogDelivery" onclick="editSetDelivery('home_delivery')">🚚 Home Delivery</button>
+        </div>
+      </div>
+
+      <div class="hs-card" id="editAddressCard" style="margin-bottom:10px;display:none;">
+        <div class="hs-card-title">📍 Delivery Address</div>
+        <div class="hs-field">
+          <label class="hs-label">Address Line 1 *</label>
+          <input class="hs-input" type="text" id="editAddrLine1" placeholder="House / Flat / Building no." autocomplete="off" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Address Line 2 <span class="hs-opt">optional</span></label>
+          <input class="hs-input" type="text" id="editAddrLine2" placeholder="Street / Locality" autocomplete="off" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Area <span class="hs-opt">optional</span></label>
+          <input class="hs-input" type="text" id="editAddrArea" placeholder="Area / Neighbourhood" autocomplete="off" />
+        </div>
+        <div class="hs-row" style="gap:8px;">
+          <div class="hs-field" style="flex:1;">
+            <label class="hs-label">City</label>
+            <input class="hs-input" type="text" id="editAddrCity" placeholder="City" autocomplete="off" />
+          </div>
+          <div class="hs-field" style="flex:1;">
+            <label class="hs-label">Pincode</label>
+            <input class="hs-input" type="text" id="editAddrPincode" placeholder="560001" autocomplete="off" maxlength="6" />
+          </div>
+        </div>
+      </div>
+
+      <div class="hs-card" style="margin-bottom:10px;">
+        <div class="hs-card-title">🛒 Items</div>
+        <div id="editItemRows"></div>
+      </div>
+
+      <div class="hs-card" style="margin-bottom:10px;">
+        <div class="hs-card-title">💳 Payment Mode</div>
+        <div class="pay-grid" id="editPayGrid"></div>
+      </div>
+
+      <div id="editTotal" style="font-family:'Playfair Display',serif;font-size:18px;
+           font-weight:700;color:var(--brown);text-align:right;margin-bottom:12px;"></div>
+
+      <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveEdit()">💾 Save Changes</button>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('editModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/common.js"></script>
+  <script>
+    const PAY_LABELS = { online:'📱 Online', cash:'💵 Cash', free:'🎁 Free' };
+
+    let allOrders  = [];
+    let menuItems  = [];
+    let itemMap    = {};
+    let selFilter  = 'all';
+
+    // Edit state
+    let editQty      = {};
+    let editDelivery = 'store_pickup';
+    let editPayMode  = 'online';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      HS.setCurrentMela({ MelaId: 'nonmela', MelaName: 'Non-Mela Sales' });
+      HS.renderSidebar('nonmela-orders');
+      HS.renderHeader({ title: 'Orders', subtitle: 'Non-Mela Sales', showMenu: true });
+      await loadAll();
+    });
+
+    async function loadAll() {
+      HS.loading(true, 'Loading orders…');
+      try {
+        const [ordersRes, menuRes] = await Promise.all([
+          HS.api({ action: 'getNonMelaOrders' }),
+          HS.api({ action: 'getMelaMenu', melaId: 'nonmela' }),
+        ]);
+        allOrders = ordersRes.data || [];
+        menuItems = (menuRes.data || []).filter(i => i.Status === 'active');
+        itemMap   = {};
+        (menuRes.data || []).forEach(it => { itemMap[it.ItemKey] = it; });
+        render();
+      } catch(e) {
+        HS.toast('Could not load orders.', 'error');
+      } finally { HS.loading(false); }
+    }
+
+    function render() {
+      const filtered = selFilter === 'all' ? allOrders
+        : allOrders.filter(o => o.DeliveryType === selFilter || o.PaymentMode === selFilter);
+
+      let html = '';
+
+      // Filter bar
+      const filters = [
+        { id:'all',           label:'All' },
+        { id:'home_delivery', label:'🚚 Home Delivery' },
+        { id:'store_pickup',  label:'🏪 Store Pickup' },
+        { id:'cash',          label:'💵 Cash' },
+        { id:'online',        label:'📱 Online' },
+        { id:'free',          label:'🎁 Free' },
+      ];
+      html += `<div class="filter-bar">`;
+      filters.forEach(f => {
+        const count = f.id === 'all' ? allOrders.length
+          : allOrders.filter(o => o.DeliveryType === f.id || o.PaymentMode === f.id).length;
+        if (f.id !== 'all' && count === 0) return;
+        html += `<div class="filter-chip ${selFilter===f.id?'on':''}"
+          onclick="setFilter('${f.id}')">${f.label} (${count})</div>`;
+      });
+      html += `</div>`;
+
+      if (!filtered.length) {
+        html += `<div class="hs-empty">
+          <div class="hs-empty-icon">🧾</div>
+          <div class="hs-empty-title">No orders</div>
+          <div class="hs-empty-sub">No orders match this filter.</div>
+        </div>`;
+      } else {
+        html += filtered.map(orderCardHTML).join('');
+      }
+
+      document.getElementById('mainPage').innerHTML = html;
+    }
+
+    function setFilter(f) { selFilter = f; render(); }
+
+    function orderCardHTML(o) {
+      const pm      = (o.PaymentMode  || 'cash').toLowerCase();
+      const dt      = (o.DeliveryType || 'store_pickup').toLowerCase();
+      const date    = HS.formatDate(o.Date) || o.Date || '—';
+      const name    = o.CustomerName || 'Anonymous';
+      const phone   = o.Phone ? ` · ${o.Phone}` : '';
+      const isFree  = pm === 'free';
+
+      // Build address string
+      const addrParts = [o.AddressLine1, o.AddressLine2, o.Area, o.City, o.Pincode].filter(Boolean);
+      const addr      = addrParts.join(', ');
+
+      // Build items summary
+      let items = {};
+      try { items = JSON.parse(o.Items || '{}'); } catch {}
+      const parts = [];
+      Object.entries(items).forEach(([key, val]) => {
+        const q = val?.qty || val || 0;
+        if (q > 0) parts.push(`${itemMap[key]?.ItemName || key} ×${q}`);
+      });
+
+      const delLabels = { home_delivery: '🚚 Home Delivery', store_pickup: '🏪 Store Pickup' };
+      const payBadges = { cash:'💵 Cash', online:'📱 Online', free:'🎁 Free' };
+
+      return `
+        <div class="order-card">
+          <div class="order-top">
+            <span class="order-date">${date}</span>
+            <div class="order-badges">
+              <span class="del-badge ${dt}">${delLabels[dt]||dt}</span>
+              <span class="pay-badge ${pm}">${payBadges[pm]||pm}</span>
+            </div>
+          </div>
+          <div class="order-customer">${name}${phone}</div>
+          ${addr ? `<div class="order-address">📍 ${addr}</div>` : ''}
+          <div class="order-items">${parts.join(', ') || '—'}</div>
+          <div class="order-footer">
+            <span class="order-amount ${isFree?'free':''}">₹${HS.fmt(o.TotalAmount)}</span>
+            <div class="order-actions">
+              <button class="order-action-btn" style="background:rgba(61,99,56,.12);"
+                onclick="openEdit('${o.OrderId}')" title="Edit">✏️</button>
+              <button class="order-action-btn" style="background:rgba(184,50,37,.10);"
+                onclick="deleteOrder('${o.OrderId}')" title="Delete">🗑️</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    /* ══ EDIT ══ */
+    function openEdit(orderId) {
+      const o = allOrders.find(o => o.OrderId === orderId);
+      if (!o) return;
+
+      document.getElementById('editOrderId').value   = orderId;
+      document.getElementById('editDate').value      = o.Date || HS.today();
+      document.getElementById('editCustName').value  = o.CustomerName || '';
+      document.getElementById('editCustPhone').value = o.Phone || '';
+      document.getElementById('editAddrLine1').value = o.AddressLine1 || '';
+      document.getElementById('editAddrLine2').value = o.AddressLine2 || '';
+      document.getElementById('editAddrArea').value  = o.Area || '';
+      document.getElementById('editAddrCity').value  = o.City || '';
+      document.getElementById('editAddrPincode').value = o.Pincode || '';
+
+      editDelivery = o.DeliveryType || 'store_pickup';
+      editPayMode  = o.PaymentMode  || 'online';
+
+      // Build qty from existing items
+      editQty = {};
+      menuItems.forEach(it => { editQty[it.ItemKey] = 0; });
+      try {
+        const items = JSON.parse(o.Items || '{}');
+        Object.entries(items).forEach(([k, v]) => { editQty[k] = v?.qty || v || 0; });
+      } catch {}
+
+      editSetDelivery(editDelivery, true);
+      renderEditItems();
+      renderEditPay();
+      updateEditTotal();
+      HS.openModal('editModal');
+    }
+
+    function editSetDelivery(type, skipRender) {
+      editDelivery = type;
+      document.getElementById('editTogPickup').className   = 'hs-tog' + (type==='store_pickup'  ?' on-green':'');
+      document.getElementById('editTogDelivery').className = 'hs-tog' + (type==='home_delivery' ?' on-green':'');
+      document.getElementById('editAddressCard').style.display = type==='home_delivery' ? '' : 'none';
+      if (!skipRender) updateEditTotal();
+    }
+
+    function renderEditItems() {
+      document.getElementById('editItemRows').innerHTML = menuItems.map(it => `
+        <div class="item-row">
+          <div class="item-info">
+            <div class="item-name">${it.ItemName}</div>
+            <div class="item-price">₹${HS.fmt(it.SellingPrice)} each</div>
+          </div>
+          <div class="hs-qty-ctrl">
+            <button class="hs-qty-btn" onclick="editChQty('${it.ItemKey}',-1)">−</button>
+            <span class="hs-qty-num ${(editQty[it.ItemKey]||0)>0?'active':''}"
+                  id="eq-${it.ItemKey}">${editQty[it.ItemKey]||0}</span>
+            <button class="hs-qty-btn" onclick="editChQty('${it.ItemKey}',1)">+</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function renderEditPay() {
+      document.getElementById('editPayGrid').innerHTML =
+        ['online','cash','free'].map(m =>
+          `<button class="hs-tog ${editPayMode===m?'on-green':''}"
+            onclick="editSetPay('${m}')">${PAY_LABELS[m]}</button>`
+        ).join('');
+    }
+
+    function editChQty(key, d) {
+      editQty[key] = Math.max(0, (editQty[key]||0) + d);
+      const el = document.getElementById('eq-' + key);
+      if (el) { el.textContent = editQty[key]; el.className = 'hs-qty-num' + (editQty[key]>0?' active':''); }
+      updateEditTotal();
+    }
+
+    function editSetPay(m) { editPayMode = m; renderEditPay(); updateEditTotal(); }
+
+    function editCalcTotal() {
+      return menuItems.reduce((s, it) => s + it.SellingPrice * (editQty[it.ItemKey]||0), 0);
+    }
+
+    function updateEditTotal() {
+      const total = editCalcTotal();
+      const el    = document.getElementById('editTotal');
+      if (el) el.textContent = total > 0 ? `Total: ₹${HS.fmt(total)}` : '';
+    }
+
+    async function saveEdit() {
+      const orderId = document.getElementById('editOrderId').value;
+      const date    = document.getElementById('editDate').value;
+      if (!date) { HS.toast('Date is required.', 'error'); return; }
+
+      const hasItems = menuItems.some(it => (editQty[it.ItemKey]||0) > 0);
+      if (!hasItems) { HS.toast('Select at least one item.', 'error'); return; }
+
+      if (editDelivery === 'home_delivery') {
+        const line1 = document.getElementById('editAddrLine1').value.trim();
+        if (!line1) { HS.toast('Address Line 1 is required for home delivery.', 'error'); return; }
+      }
+
+      const items = {};
+      menuItems.forEach(it => {
+        if ((editQty[it.ItemKey]||0) > 0)
+          items[it.ItemKey] = { qty: editQty[it.ItemKey], price: it.SellingPrice };
+      });
+
+      const isDelivery = editDelivery === 'home_delivery';
+      const data = {
+        orderId,
+        date,
+        customerName: document.getElementById('editCustName').value.trim(),
+        phone:        document.getElementById('editCustPhone').value.trim(),
+        deliveryType: editDelivery,
+        addressLine1: isDelivery ? document.getElementById('editAddrLine1').value.trim() : '',
+        addressLine2: isDelivery ? document.getElementById('editAddrLine2').value.trim() : '',
+        area:         isDelivery ? document.getElementById('editAddrArea').value.trim()  : '',
+        city:         isDelivery ? document.getElementById('editAddrCity').value.trim()  : '',
+        pincode:      isDelivery ? document.getElementById('editAddrPincode').value.trim() : '',
+        items,
+        totalAmount:  editCalcTotal(),
+        paymentMode:  editPayMode,
+      };
+
+      HS.closeModal('editModal');
+      HS.loading(true, 'Saving…');
+      try {
+        const res = await HS.api({ action: 'updateNonMelaOrder', data: JSON.stringify(data) });
+        if (res.success) { HS.toast('✅ Order updated!', 'success'); await loadAll(); }
+        else HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    /* ══ DELETE ══ */
+    async function deleteOrder(orderId) {
+      HS.confirm('Delete this order? This cannot be undone.', async () => {
+        HS.loading(true, 'Deleting…');
+        try {
+          const res = await HS.api({ action: 'deleteNonMelaOrder', orderId });
+          if (res.success) { HS.toast('Order deleted.', 'success'); await loadAll(); }
+          else HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+        } catch(e) { HS.toast('Network error.', 'error'); }
+        finally { HS.loading(false); }
+      });
+    }
+  </script>
+</body>
+</html>

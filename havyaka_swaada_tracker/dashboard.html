@@ -30,7 +30,11 @@
 
     <!-- TAB 1: THIS MELA -->
     <div class="tab-panel active" id="panel-mela">
-      <button class="hs-btn hs-btn-secondary hs-btn-full hs-mb" style="margin-top:0;" onclick="loadMelaData()">🔄 Refresh</button>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="hs-btn hs-btn-secondary" style="flex:1;" onclick="loadMelaData()">🔄 Refresh</button>
+        <button class="hs-btn" style="flex:1;background:rgba(196,132,26,.12);color:var(--gold);font-weight:700;font-size:12px;"
+          onclick="recalcCOGS()">🧮 Recalc COGS</button>
+      </div>
       <div class="hs-card">
         <div class="hs-card-title">📆 Filter by Day</div>
         <div class="day-chips" id="dayChips"></div>
@@ -512,6 +516,29 @@
     }
 
 
+
+    /* ── Recalculate COGS for current mela ── */
+    async function recalcCOGS() {
+      HS.confirm(
+        'Recalculate ingredient costs for all past sales in this mela?\n\nThis updates Cost of Goods to reflect your current recipes and item sizes.',
+        async () => {
+          HS.loading(true, 'Recalculating COGS…');
+          try {
+            const res = await HS.api({ action: 'recalcCOGS', melaId: mela.MelaId });
+            if (res.success) {
+              HS.toast(`✅ Recalculated ${res.updated} sale deduction${res.updated!==1?'s':''}!`, 'success');
+              // Reload dashboard data to reflect new COGS
+              melaDeductions = [];
+              melaCOGS       = 0;
+              await loadMelaData();
+            } else {
+              HS.toast('Error: ' + (res.error || 'Unknown'), 'error');
+            }
+          } catch(e) { HS.toast('Network error.', 'error'); }
+          finally { HS.loading(false); }
+        }
+      );
+    }
   </script>
 </body>
 </html>

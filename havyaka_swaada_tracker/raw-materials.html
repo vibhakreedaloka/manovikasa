@@ -248,6 +248,7 @@
     }
     .shortfall-box ul { margin: 6px 0 0 16px; }
     .shortfall-box li { margin-bottom: 3px; }
+
   </style>
 </head>
 <body>
@@ -255,8 +256,10 @@
   <header class="hs-header" id="hs-header"></header>
 
   <div class="hs-top-tabs" id="rmTabBar">
-    <button class="hs-tab active" onclick="switchRmTab('materials', this)">🧺 Materials</button>
-    <button class="hs-tab"       onclick="switchRmTab('preparations', this)">🍳 Preparations</button>
+    <button class="hs-tab active" onclick="switchRmTab('materials',    this)">🧺 Materials</button>
+    <button class="hs-tab"       onclick="switchRmTab('recipes', this)">📋 Recipes</button>
+    <button class="hs-tab"       onclick="switchRmTab('preparations',  this)">🍳 Preparations</button>
+    <button class="hs-tab"       onclick="switchRmTab('menuitems',     this)">🍽️ Menu Items</button>
   </div>
 
   <main class="hs-page">
@@ -293,12 +296,32 @@
 
     </div><!-- /rmPanel-materials -->
 
+    <!-- TAB: RECIPES (iframe for full isolation) -->
+    <div id="rmPanel-recipes" style="display:none;">
+      <iframe id="recipesIframe"
+        src=""
+        style="width:100%;border:none;height:600px;display:block;"
+        loading="lazy"
+        onload="resizeRecipesIframe(this)">
+      </iframe>
+    </div>
+
     <!-- TAB: PREPARATIONS -->
     <div id="rmPanel-preparations" style="display:none;">
       <div id="prepContent">
         <div class="hs-empty">
           <div class="hs-spinner" style="margin:0 auto 12px;"></div>
           <div class="hs-empty-sub">Loading preparations…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: MENU ITEMS -->
+    <div id="rmPanel-menuitems" style="display:none;">
+      <div id="menuItemsContent">
+        <div class="hs-empty">
+          <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+          <div class="hs-empty-sub">Loading menu items…</div>
         </div>
       </div>
     </div>
@@ -464,6 +487,57 @@
     </div>
   </div>
 
+  <!-- FAB: Add Menu Item (shown only on Menu Items tab) -->
+  <button class="hs-fab" id="rmMenuFab" onclick="openAddMenuItem()"
+    aria-label="Add Menu Item" style="bottom:24px;display:none;">+</button>
+
+  <!-- ══ ADD / EDIT GLOBAL MENU ITEM MODAL ══ -->
+  <div class="hs-modal-bg" id="miModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="miModalTitle">Add Menu Item</div>
+      <input type="hidden" id="miItemKey" />
+
+      <div class="hs-field">
+        <label class="hs-label">Item Name *</label>
+        <input class="hs-input" type="text" id="miName"
+               placeholder="e.g. NutriPower 125g" autocomplete="off" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Category *</label>
+        <div id="miCatWrap"></div>
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Base Selling Price (₹) *</label>
+        <input class="hs-input" type="number" id="miPrice" min="0"
+               placeholder="e.g. 199" />
+      </div>
+      <div class="hs-row" style="gap:8px;">
+        <div class="hs-field" style="flex:1;">
+          <label class="hs-label">Size</label>
+          <input class="hs-input" type="number" id="miSize" min="0"
+                 step="any" placeholder="e.g. 125" />
+        </div>
+        <div class="hs-field" style="flex:1;">
+          <label class="hs-label">Unit</label>
+          <input class="hs-input" type="text" id="miSizeUnit" readonly
+                 placeholder="Set by category"
+                 style="background:var(--cream-dark);color:var(--text-muted);cursor:default;" />
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">
+            From category base unit
+          </div>
+        </div>
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveMenuItem()">💾 Save</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('miModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="assets/common.js"></script>
   <script>
     /* ── State ── */
@@ -490,10 +564,13 @@
     /* ── INIT ── */
     document.addEventListener('DOMContentLoaded', async () => {
       HS.renderHeader({ title: 'Raw Materials', showBack: true });
-      // Auto-switch to preparations tab if URL hash says so
-      if (window.location.hash === '#preparations') {
-        const prepTabBtn = document.querySelector('.hs-tab:last-child');
-        if (prepTabBtn) switchRmTab('preparations', prepTabBtn);
+      // Auto-switch based on URL hash
+      if (window.location.hash === '#recipes') {
+        const btn = document.querySelectorAll('.hs-tab')[1];
+        if (btn) switchRmTab('recipes', btn);
+      } else if (window.location.hash === '#preparations') {
+        const btn = document.querySelectorAll('.hs-tab')[2];
+        if (btn) switchRmTab('preparations', btn);
       }
       await loadAll();
     });
@@ -517,14 +594,21 @@
           arr.sort((a,b) => (b.PurchasedAt||'').localeCompare(a.PurchasedAt||''))
         );
         renderList();
-        renderSummary();
+        renderMaterialSummary();
       } catch(e) {
         HS.toast('Could not load raw materials.', 'error');
+        document.getElementById('rmList').innerHTML = `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">⚠️</div>
+            <div class="hs-empty-title">Could not load</div>
+            <div class="hs-empty-sub">Check that the Apps Script is deployed and try refreshing.</div>
+            <button class="hs-btn hs-btn-primary hs-mt" onclick="loadAll()">🔄 Retry</button>
+          </div>`;
       } finally { HS.loading(false); }
     }
 
     /* ── SUMMARY ── */
-    function renderSummary() {
+    function renderMaterialSummary() {
       const active = materials.filter(m => m.Status !== 'archived');
       let totalSpend = 0;
       Object.values(purchases).forEach(arr =>
@@ -810,10 +894,21 @@
       document.querySelectorAll('.hs-tab').forEach(t => t.classList.remove('active'));
       el.classList.add('active');
       document.getElementById('rmPanel-materials').style.display    = tab === 'materials'    ? '' : 'none';
+      document.getElementById('rmPanel-recipes').style.display      = tab === 'recipes'      ? '' : 'none';
       document.getElementById('rmPanel-preparations').style.display = tab === 'preparations' ? '' : 'none';
-      // Show/hide FAB — only show on materials tab
-      document.getElementById('rmFab').style.display = tab === 'materials' ? '' : 'none';
+      document.getElementById('rmPanel-menuitems').style.display    = tab === 'menuitems'    ? '' : 'none';
+      // FAB: materials = add raw material, menuitems = add menu item, others = hidden
+      document.getElementById('rmFab').style.display    = tab === 'materials'  ? '' : 'none';
+      document.getElementById('rmMenuFab').style.display = tab === 'menuitems' ? '' : 'none';
       if (tab === 'preparations' && !prepLoaded) loadPreparations();
+      if (tab === 'menuitems'    && !menuItemsLoaded) loadMenuItems();
+      // Lazy-load recipes iframe on first visit
+      if (tab === 'recipes') {
+        const iframe = document.getElementById('recipesIframe');
+        if (iframe && !iframe.src.includes('recipes.html')) {
+          iframe.src = 'recipes.html?embed=1';
+        }
+      }
     }
 
     /* ══════════════════════════════════════
@@ -1150,6 +1245,263 @@
       } catch(e) { HS.toast('Network error.', 'error'); }
       finally { HS.loading(false); }
     }
+
+
+    /* ══════════════════════════════════════
+       MENU ITEMS TAB
+    ══════════════════════════════════════ */
+    let menuItemsLoaded = false;
+    let globalMenuItems = [];
+    let miCategories    = [];
+    let miFilter        = 'active';
+    let miCatSettings   = {}; // { catName: { baseValue, baseUnit } }
+
+    async function loadMenuItems() {
+      HS.loading(true, 'Loading menu items…');
+      try {
+        // Sequential to pinpoint failures
+        const miRes  = await HS.api({ action: 'getMenuItems', includeArchived: '1' });
+        const catRes = await HS.api({ action: 'getCategories' });
+        globalMenuItems = miRes.data  || [];
+        miCategories    = catRes.data || [];
+        menuItemsLoaded = true;
+        renderMenuItems();
+      } catch(err) {
+        const msg = err?.message || String(err);
+        HS.toast('Could not load menu items: ' + msg, 'error');
+        document.getElementById('menuItemsContent').innerHTML = `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">⚠️</div>
+            <div class="hs-empty-title">Could not load</div>
+            <div class="hs-empty-sub" style="color:var(--red);font-size:12px;">${msg}</div>
+            <button class="hs-btn hs-btn-primary hs-mt" onclick="loadMenuItems()">🔄 Retry</button>
+          </div>`;
+      } finally { HS.loading(false); }
+    }
+
+    function renderMenuItems() {
+      const filtered = globalMenuItems.filter(m =>
+        miFilter === 'all'      ? true :
+        miFilter === 'archived' ? m.Status === 'archived' :
+                                  m.Status !== 'archived'
+      );
+
+      // Group by category
+      const byCategory = {};
+      filtered.forEach(m => {
+        const cat = m.Category || 'Uncategorised';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(m);
+      });
+
+      const active   = globalMenuItems.filter(m => m.Status !== 'archived').length;
+      const archived = globalMenuItems.filter(m => m.Status === 'archived').length;
+
+      let html = `
+        <div class="rm-filter" style="margin-bottom:12px;">
+          <button class="rm-filter-btn ${miFilter==='active'?'active':''}"
+            onclick="setMiFilter('active',this)">Active (${active})</button>
+          <button class="rm-filter-btn ${miFilter==='archived'?'active':''}"
+            onclick="setMiFilter('archived',this)">Archived (${archived})</button>
+          <button class="rm-filter-btn ${miFilter==='all'?'active':''}"
+            onclick="setMiFilter('all',this)">All (${globalMenuItems.length})</button>
+        </div>`;
+
+      if (!filtered.length) {
+        html += `<div class="hs-empty">
+          <div class="hs-empty-icon">🍽️</div>
+          <div class="hs-empty-title">No menu items</div>
+          <div class="hs-empty-sub">Tap + to add your first global menu item.</div>
+        </div>`;
+      } else {
+        Object.entries(byCategory).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([cat, items]) => {
+          html += `<div class="rm-section-head">${cat}</div>`;
+          items.sort((a,b)=>(a.ItemName||'').localeCompare(b.ItemName||'')).forEach(m => {
+            const isArch = m.Status === 'archived';
+            const size   = m.Size ? `${m.Size} ${m.SizeUnit||''}` : '';
+            html += `
+              <div class="rm-card${isArch?' archived':''}">
+                <div class="rm-card-top">
+                  <div class="rm-card-meta">
+                    <div class="rm-card-name">${m.ItemName}</div>
+                    ${size ? `<span class="unit-badge">${size}</span>` : ''}
+                    ${isArch ? `<span class="hs-badge" style="margin-left:6px;
+                      background:var(--border);color:var(--text-muted);">Archived</span>` : ''}
+                  </div>
+                  <div class="rm-card-right">
+                    <div class="rm-card-cost">₹${HS.fmt(m.DefaultPrice||0)}</div>
+                    <div class="rm-card-actions">
+                      ${isArch
+                        ? `<button class="rm-action-btn rm-restore-btn"
+                             onclick="archiveMI('${m.ItemKey}','active')" title="Restore">♻️</button>`
+                        : `<button class="rm-action-btn rm-edit-btn"
+                             onclick="openEditMenuItem('${m.ItemKey}')" title="Edit">✏️</button>
+                           <button class="rm-action-btn rm-archive-btn"
+                             onclick="archiveMI('${m.ItemKey}','archived')" title="Archive">📦</button>`
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>`;
+          });
+        });
+      }
+
+      document.getElementById('menuItemsContent').innerHTML = html;
+    }
+
+    function setMiFilter(f, el) {
+      miFilter = f;
+      document.querySelectorAll('.rm-filter-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+      renderMenuItems();
+    }
+
+    /* ── Category helper (reuse raw-materials pattern) ── */
+    function miCatSelectHTML(wrapperId, selected) {
+      const opts = miCategories.map(c =>
+        `<option value="${c}" ${c===selected?'selected':''}>${c}</option>`
+      ).join('');
+      return `
+        <select class="hs-input" id="${wrapperId}_sel"
+          onchange="miOnCatChange('${wrapperId}')">
+          <option value="">-- Select category --</option>
+          ${opts}
+          <option value="__new__">＋ Add new category</option>
+        </select>
+        <div id="${wrapperId}_new" style="display:none;margin-top:8px;">
+          <div class="hs-row">
+            <input class="hs-input" type="text" id="${wrapperId}_inp"
+                   placeholder="New category name…" style="flex:1;" />
+            <button class="hs-btn hs-btn-primary hs-btn-sm"
+              onclick="miConfirmNewCat('${wrapperId}')">Add</button>
+          </div>
+        </div>`;
+    }
+
+    function miOnCatChange(w) {
+      const sel = document.getElementById(w + '_sel');
+      const nf  = document.getElementById(w + '_new');
+      if (sel.value === '__new__') {
+        nf.style.display = 'block';
+        document.getElementById(w + '_inp').focus();
+      } else {
+        nf.style.display = 'none';
+        // Auto-fill unit from category base unit
+        const catSetting = miCatSettings[sel.value] || {};
+        const unitEl     = document.getElementById('miSizeUnit');
+        if (unitEl && catSetting.baseUnit) unitEl.value = catSetting.baseUnit;
+        else if (unitEl) unitEl.value = '';
+      }
+    }
+
+    async function miConfirmNewCat(w) {
+      const name = document.getElementById(w + '_inp').value.trim();
+      if (!name) { HS.toast('Enter a category name.', 'error'); return; }
+      try {
+        const res = await HS.api({ action: 'addCategory', name });
+        if (res.success) {
+          miCategories.push(name);
+          document.getElementById(w).innerHTML = miCatSelectHTML(w, name);
+          HS.toast('✅ Category added!', 'success');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+    }
+
+    function miGetCat(w) {
+      const sel = document.getElementById(w + '_sel');
+      return sel && sel.value !== '__new__' ? sel.value : '';
+    }
+
+    /* ── Add / Edit ── */
+    function openAddMenuItem() {
+      document.getElementById('miModalTitle').textContent = 'Add Menu Item';
+      document.getElementById('miItemKey').value  = '';
+      document.getElementById('miName').value     = '';
+      document.getElementById('miPrice').value    = '';
+      document.getElementById('miSize').value     = '';
+      document.getElementById('miSizeUnit').value = '';
+      document.getElementById('miCatWrap').innerHTML = miCatSelectHTML('miCatWrap', '');
+      HS.openModal('miModal');
+    }
+
+    function openEditMenuItem(itemKey) {
+      const m = globalMenuItems.find(m => m.ItemKey === itemKey);
+      if (!m) return;
+      document.getElementById('miModalTitle').textContent = 'Edit Menu Item';
+      document.getElementById('miItemKey').value  = itemKey;
+      document.getElementById('miName').value     = m.ItemName     || '';
+      document.getElementById('miPrice').value    = m.DefaultPrice || '';
+      document.getElementById('miSize').value     = m.Size         || '';
+      document.getElementById('miCatWrap').innerHTML = miCatSelectHTML('miCatWrap', m.Category || '');
+      // Auto-fill unit: use item's existing SizeUnit, fallback to category base unit
+      const catSetting = miCatSettings[m.Category] || {};
+      document.getElementById('miSizeUnit').value = m.SizeUnit || catSetting.baseUnit || '';
+      HS.openModal('miModal');
+    }
+
+    async function saveMenuItem() {
+      const itemKey  = document.getElementById('miItemKey').value;
+      const name     = document.getElementById('miName').value.trim();
+      const category = miGetCat('miCatWrap');
+      const priceVal = document.getElementById('miPrice').value.trim();
+      const size     = Number(document.getElementById('miSize').value || 0);
+      const sizeUnit = document.getElementById('miSizeUnit').value;
+
+      if (!name)     { HS.toast('Name is required.', 'error');     return; }
+      if (!category) { HS.toast('Category is required.', 'error'); return; }
+      if (!priceVal) { HS.toast('Price is required.', 'error');    return; }
+      const price = Number(priceVal);
+      if (isNaN(price) || price < 0) { HS.toast('Enter a valid price.', 'error'); return; }
+
+      HS.closeModal('miModal');
+      HS.loading(true, itemKey ? 'Updating…' : 'Saving…');
+      try {
+        const isEdit = !!itemKey;
+        const action = isEdit ? 'updateGlobalMenuItem' : 'addGlobalMenuItem';
+        const data   = { itemKey, name, price, category, size, sizeUnit };
+        const res    = await HS.api({ action, data: JSON.stringify(data) });
+        if (res.success) {
+          HS.toast(isEdit ? '✅ Item updated!' : '✅ Item added!', 'success');
+          menuItemsLoaded = false;
+          await loadMenuItems();
+        } else { HS.toast('Error: ' + (res.error || 'Unknown'), 'error'); }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    async function archiveMI(itemKey, status) {
+      const m     = globalMenuItems.find(m => m.ItemKey === itemKey);
+      const label = status === 'archived' ? 'archive' : 'restore';
+      HS.confirm(`${label.charAt(0).toUpperCase()+label.slice(1)} "${m?.ItemName}"?`, async () => {
+        HS.loading(true, status === 'archived' ? 'Archiving…' : 'Restoring…');
+        try {
+          const res = await HS.api({ action: 'archiveGlobalMenuItem', itemKey, status });
+          if (res.success) {
+            HS.toast(`✅ ${m?.ItemName} ${status === 'archived' ? 'archived' : 'restored'}.`, 'success');
+            menuItemsLoaded = false;
+            await loadMenuItems();
+          } else { HS.toast('Error: ' + (res.error||'Unknown'), 'error'); }
+        } catch(e) { HS.toast('Network error.', 'error'); }
+        finally { HS.loading(false); }
+      });
+    }
+
+    /* ── Recipes iframe auto-resize ── */
+    function resizeRecipesIframe(iframe) {
+      try {
+        const h = iframe.contentDocument?.body?.scrollHeight;
+        if (h && h > 200) iframe.style.height = h + 'px';
+      } catch(e) {}
+    }
+
+    // Listen for height updates posted from the embedded recipes page
+    window.addEventListener('message', e => {
+      if (e.data?.type === 'recipesHeight') {
+        const iframe = document.getElementById('recipesIframe');
+        if (iframe) iframe.style.height = e.data.height + 'px';
+      }
+    });
   </script>
 </body>
 </html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Non-Mela Dashboard — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .day-chip-wrap { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+    .day-chip {
+      padding:5px 13px; border-radius:20px;
+      border:1.5px solid var(--border); background:var(--cream);
+      font-size:12px; font-weight:700; color:var(--brown-mid); cursor:pointer;
+    }
+    .day-chip.on { background:var(--brown); border-color:var(--brown); color:#fff; }
+    .chart-wrap { position:relative; height:200px; }
+    .chart-wrap.tall  { height:280px; }
+    .chart-wrap.short { height:140px; }
+    .inf-note { font-size:12px; color:var(--gold); font-weight:600; margin-bottom:10px; }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page" id="mainPage">
+    <div class="hs-empty">
+      <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+      <div class="hs-empty-sub">Loading dashboard…</div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+    const PALETTE = ['#3D6338','#C4841A','#B83225','#5B8FA8','#8B6F47','#6B8E23','#CD853F','#708090'];
+
+    let allOrders   = [];
+    let allDeductions = [];
+    let menuItems   = [];
+    let itemMap     = {};
+    let selDay      = 'all';
+    let myCharts    = {};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      HS.setCurrentMela({ MelaId: 'nonmela', MelaName: 'Non-Mela Sales' });
+      HS.renderSidebar('nonmela-dashboard');
+      HS.renderHeader({ title: 'Dashboard', subtitle: 'Non-Mela Sales', showMenu: true });
+      await loadAll();
+    });
+
+    async function loadAll() {
+      HS.loading(true, 'Loading…');
+      try {
+        const [ordersRes, menuRes, dedRes] = await Promise.all([
+          HS.api({ action: 'getNonMelaOrders' }),
+          HS.api({ action: 'getMelaMenu', melaId: 'nonmela' }),
+          HS.api({ action: 'getSaleDeductions', melaId: 'nonmela' }),
+        ]);
+        allOrders     = (ordersRes.data || []).map(o => ({
+          ...o,
+          Date: HS.normDate(o.Date),
+          _items: (() => { try { return JSON.parse(o.Items||'{}'); } catch { return {}; } })(),
+        }));
+        menuItems = menuRes.data || [];
+        itemMap   = {};
+        menuItems.forEach(it => { itemMap[it.ItemKey] = it; });
+        allDeductions = dedRes.data || [];
+        selDay = 'all';
+        buildDayChips();
+        renderDash();
+      } catch(e) {
+        HS.toast('Could not load dashboard.', 'error');
+      } finally { HS.loading(false); }
+    }
+
+    function buildDayChips() {
+      const days = [...new Set(allOrders.map(o => o.Date).filter(Boolean))].sort();
+      const el   = document.getElementById('dayChips');
+      if (!el) return;
+      el.innerHTML = `<div class="day-chip ${selDay==='all'?'on':''}" onclick="pickDay('all')">All Days</div>`;
+      days.forEach(d => {
+        el.innerHTML += `<div class="day-chip ${selDay===d?'on':''}" onclick="pickDay('${d}')">${HS.shortDate(d)}</div>`;
+      });
+    }
+
+    function pickDay(day) { selDay = day; buildDayChips(); renderDash(); }
+
+    function filteredOrders() {
+      return selDay === 'all' ? allOrders : allOrders.filter(o => o.Date === selDay);
+    }
+
+    function renderDash() {
+      const orders  = filteredOrders();
+      const revenue = orders.filter(o => o.PaymentMode==='cash'||o.PaymentMode==='online')
+                            .reduce((s,o) => s+Number(o.TotalAmount||0), 0);
+      const cashRev    = orders.filter(o=>o.PaymentMode==='cash').reduce((s,o)=>s+Number(o.TotalAmount||0),0);
+      const onlineRev  = orders.filter(o=>o.PaymentMode==='online').reduce((s,o)=>s+Number(o.TotalAmount||0),0);
+      const freeVal    = orders.filter(o=>o.PaymentMode==='free').reduce((s,o)=>s+Number(o.TotalAmount||0),0);
+      const delivered  = orders.filter(o=>o.DeliveryType==='home_delivery');
+      const pickedUp   = orders.filter(o=>o.DeliveryType==='store_pickup');
+
+      // COGS — filter by day with SaleDate fallback to TransactionId
+      const filteredOrderIds = new Set(orders.map(o => o.OrderId).filter(Boolean));
+      const cogs = selDay === 'all'
+        ? allDeductions.reduce((s,d)=>s+Number(d.CostOfGoods||0),0)
+        : allDeductions.reduce((s,d) => {
+            const sd = HS.normDate(d.SaleDate||'');
+            const match = sd ? sd===selDay : filteredOrderIds.has(d.TransactionId);
+            return match ? s+Number(d.CostOfGoods||0) : s;
+          }, 0);
+
+      const pl        = revenue - cogs;
+      const isProfit  = pl >= 0;
+      const plClass   = isProfit ? 's-green' : 's-red';
+
+      // Items breakdown
+      const counts={}, revenues={};
+      orders.forEach(o => {
+        Object.entries(o._items||{}).forEach(([key,val]) => {
+          const q = val?.qty || 0;
+          const p = val?.price !== null && val?.price !== undefined ? Number(val.price)
+                    : (itemMap[key]?.SellingPrice || 0);
+          counts[key]   = (counts[key]||0) + q;
+          revenues[key] = (revenues[key]||0) + q * p;
+        });
+      });
+      const allKeys = Object.keys(counts).filter(k=>counts[k]>0);
+      const iLabels = allKeys.map(k=>itemMap[k]?.ItemName||k);
+      const iColors = allKeys.map((_,i)=>PALETTE[i%PALETTE.length]);
+
+      // Orders per day
+      const dayMap = {};
+      orders.forEach(o => { if (o.Date) dayMap[o.Date]=(dayMap[o.Date]||0)+1; });
+      const dayKeys = Object.keys(dayMap).sort();
+
+      document.getElementById('mainPage').innerHTML = `
+        <!-- Day filter -->
+        <div class="hs-card" style="margin-bottom:12px;">
+          <div class="hs-card-title">📅 FILTER BY DAY</div>
+          <div class="day-chip-wrap" id="dayChips"></div>
+        </div>
+
+        <!-- Stat boxes -->
+        <div class="hs-stat-grid">
+          <div class="hs-stat-box s-green" onclick="HS.navigate('nonmela-orders.html')" style="cursor:pointer;">
+            <div class="hs-stat-num">₹${HS.fmt(revenue)}</div><div class="hs-stat-lbl">Revenue ↗</div>
+          </div>
+          <div class="hs-stat-box s-red">
+            <div class="hs-stat-num">₹${HS.fmt(cogs)}</div><div class="hs-stat-lbl">Cost of Goods</div>
+          </div>
+          <div class="hs-stat-box ${plClass}" style="grid-column:1/-1;">
+            <div class="hs-stat-num">${isProfit?'':'−'}₹${HS.fmt(Math.abs(pl))}</div>
+            <div class="hs-stat-lbl">Net ${isProfit?'Profit':'Loss'}</div>
+          </div>
+          <div class="hs-stat-box">
+            <div class="hs-stat-num">${orders.length}</div><div class="hs-stat-lbl">Orders</div>
+          </div>
+          <div class="hs-stat-box">
+            <div class="hs-stat-num">₹${HS.fmt(cashRev)}</div><div class="hs-stat-lbl">Cash</div>
+          </div>
+          <div class="hs-stat-box s-gold">
+            <div class="hs-stat-num">₹${HS.fmt(onlineRev)}</div><div class="hs-stat-lbl">Online</div>
+          </div>
+          <div class="hs-stat-box">
+            <div class="hs-stat-num">₹${HS.fmt(freeVal)}</div><div class="hs-stat-lbl">Free Given</div>
+          </div>
+        </div>
+
+        <!-- Delivery breakdown -->
+        <div class="hs-card">
+          <div class="hs-card-title">🚚 Delivery Breakdown</div>
+          <div class="hs-stat-grid" style="margin-top:8px;">
+            <div class="hs-stat-box s-green">
+              <div class="hs-stat-num">${delivered.length}</div>
+              <div class="hs-stat-lbl">Home Delivered</div>
+            </div>
+            <div class="hs-stat-box s-gold">
+              <div class="hs-stat-num">${pickedUp.length}</div>
+              <div class="hs-stat-lbl">Store Pickup</div>
+            </div>
+            <div class="hs-stat-box">
+              <div class="hs-stat-num">₹${HS.fmt(delivered.reduce((s,o)=>s+Number(o.TotalAmount||0),0))}</div>
+              <div class="hs-stat-lbl">Delivered Value</div>
+            </div>
+            <div class="hs-stat-box">
+              <div class="hs-stat-num">₹${HS.fmt(pickedUp.reduce((s,o)=>s+Number(o.TotalAmount||0),0))}</div>
+              <div class="hs-stat-lbl">Pickup Value</div>
+            </div>
+          </div>
+        </div>
+
+        ${dayKeys.length > 1 ? `
+        <div class="hs-card"><div class="hs-card-title">📅 Orders per Day</div>
+          <div class="chart-wrap"><canvas id="chartDays"></canvas></div></div>` : ''}
+
+        ${allKeys.length ? `
+        <div class="hs-card"><div class="hs-card-title">📦 Items Sold</div>
+          <div class="chart-wrap tall"><canvas id="chartCount"></canvas></div></div>
+        <div class="hs-card"><div class="hs-card-title">💰 Revenue by Item</div>
+          <div class="chart-wrap tall"><canvas id="chartRevenue"></canvas></div></div>` : ''}
+
+        <div class="hs-card"><div class="hs-card-title">💳 Payment Breakdown</div>
+          <div class="chart-wrap short"><canvas id="chartPayment"></canvas></div></div>`;
+
+      buildDayChips();
+
+      // Charts
+      if (dayKeys.length > 1) {
+        drawHBar('chartDays', dayKeys.map(d=>HS.shortDate(d)), dayKeys.map(d=>dayMap[d]),
+          dayKeys.map((_,i)=>PALETTE[i%PALETTE.length]));
+      }
+      if (allKeys.length) {
+        drawHBar('chartCount',   iLabels, allKeys.map(k=>counts[k]),   iColors);
+        drawHBar('chartRevenue', iLabels, allKeys.map(k=>revenues[k]), iColors, true);
+      }
+      drawHBar('chartPayment',
+        ['Cash','Online','Free'],
+        [orders.filter(o=>o.PaymentMode==='cash').length,
+         orders.filter(o=>o.PaymentMode==='online').length,
+         orders.filter(o=>o.PaymentMode==='free').length],
+        ['#3D6338','#C4841A','#A09070']);
+    }
+
+    function drawHBar(id, labels, data, colors, isRupee=false) {
+      if (myCharts[id]) { myCharts[id].destroy(); delete myCharts[id]; }
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      myCharts[id] = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets:[{ data, backgroundColor:colors, borderRadius:5, borderSkipped:false }] },
+        options: {
+          indexAxis: 'y', responsive:true, maintainAspectRatio:false,
+          plugins: {
+            legend: { display:false },
+            tooltip: { callbacks:{ label: ctx => isRupee?` ₹${HS.fmt(ctx.parsed.x)}`:` ${ctx.parsed.x}` } }
+          },
+          scales: {
+            x: { beginAtZero:true, grid:{color:'rgba(0,0,0,.06)'},
+                 ticks:{ callback:v=>isRupee?'₹'+HS.fmt(v):v, font:{family:'Nunito',size:11} } },
+            y: { grid:{display:false}, ticks:{ font:{family:'Nunito',size:11},
+                 callback: function(value) {
+                   const l = this.getLabelForValue(value);
+                   return l.length>22?l.slice(0,22)+'…':l;
+                 }}}
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

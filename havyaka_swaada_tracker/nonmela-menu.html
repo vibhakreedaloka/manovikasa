@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Menu — Havyaka Swaada</title>
+  <title>Non-Mela Menu — Havyaka Swaada</title>
   <link rel="stylesheet" href="assets/style.css" />
   <style>
     /* Item card */
@@ -119,20 +119,44 @@
   <div class="hs-modal-bg" id="addModal">
     <div class="hs-modal">
       <div class="hs-modal-handle"></div>
-      <div class="hs-modal-title">Add Items to Mela</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">
-        Pick from the global menu library. To create a new item, go to
-        <a onclick="HS.navigate('raw-materials.html')" style="color:var(--gold);font-weight:700;cursor:pointer;">
-          Raw Materials → Menu Items</a>.
+      <div class="hs-modal-title">Add Items</div>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="tabLibBtn" onclick="switchModalTab('lib')">📚 From Library</button>
+        <button class="modal-tab"        id="tabNewBtn" onclick="switchModalTab('new')">✨ Create New</button>
       </div>
-      <input class="search-input" type="text" id="libSearch"
-             placeholder="Search items…" oninput="filterLib()" />
-      <div id="libList" style="max-height:50vh;overflow-y:auto;"></div>
-      <div class="hs-mt">
-        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="addSelectedItems()">
-          ✓ Add Selected Items
-        </button>
+
+      <!-- Library Tab -->
+      <div id="tabLib">
+        <input class="search-input" type="text" id="libSearch"
+               placeholder="Search items…" oninput="filterLib()" />
+        <div id="libList" style="max-height:45vh;overflow-y:auto;"></div>
+        <div class="hs-mt">
+          <button class="hs-btn hs-btn-primary hs-btn-full" onclick="addSelectedItems()">
+            ✓ Add Selected Items
+          </button>
+        </div>
       </div>
+
+      <!-- Create New Tab -->
+      <div id="tabNew" style="display:none;">
+        <div class="hs-field">
+          <label class="hs-label">Item Name *</label>
+          <input class="hs-input" type="text" id="newName" placeholder="e.g. Mango Juice" autocomplete="off" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Selling Price (₹) *</label>
+          <input class="hs-input" type="number" id="newPrice" placeholder="e.g. 60" min="0" />
+        </div>
+        <div class="hs-field">
+          <label class="hs-label">Category</label>
+          <div id="newCatWrap"></div>
+        </div>
+        <div class="hs-mt">
+          <button class="hs-btn hs-btn-gold hs-btn-full" onclick="createNewItem()">✨ Create & Add</button>
+        </div>
+      </div>
+
       <div class="hs-mt-sm">
         <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('addModal')">Cancel</button>
       </div>
@@ -143,22 +167,24 @@
   <div class="hs-modal-bg" id="editModal">
     <div class="hs-modal">
       <div class="hs-modal-handle"></div>
-      <div class="hs-modal-title" id="editName" style="font-family:'Playfair Display',serif;font-size:17px;"></div>
-      <div id="editItemInfo" style="font-size:12px;color:var(--text-muted);margin-bottom:14px;"></div>
+      <div class="hs-modal-title">Edit Item</div>
       <input type="hidden" id="editItemKey" />
 
       <div class="hs-field">
-        <label class="hs-label">Selling Price for This Mela (₹) *</label>
+        <label class="hs-label">Item Name</label>
+        <input class="hs-input" type="text" id="editName" placeholder="Item name" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Category</label>
+        <div id="editCatWrap"></div>
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Selling Price (₹)</label>
         <input class="hs-input" type="number" id="editPrice" placeholder="e.g. 249" min="0" />
-        <div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;">
-          To change name, size or category — edit in
-          <a onclick="HS.closeModal('editModal');HS.navigate('raw-materials.html')"
-             style="color:var(--gold);font-weight:700;cursor:pointer;">Raw Materials → Menu Items ↗</a>
-        </div>
       </div>
 
       <div class="hs-mt">
-        <button class="hs-btn hs-btn-gold hs-btn-full" onclick="saveEdit()">💾 Save Price</button>
+        <button class="hs-btn hs-btn-gold hs-btn-full" onclick="saveEdit()">💾 Save Changes</button>
       </div>
       <div class="hs-mt-sm">
         <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('editModal')">Cancel</button>
@@ -184,7 +210,7 @@
       if (setupMode) {
         HS.renderHeader({ title: 'Set Up Menu', subtitle: mela.MelaName, showBack: true });
       } else {
-        HS.renderSidebar('menu');
+        HS.renderSidebar('nonmela-menu');
         HS.renderHeader({
           title: 'Menu', subtitle: mela.MelaName, showMenu: true,
           rightIcon: '🔄', rightFn: 'loadAll(true)',
@@ -362,14 +388,26 @@
     }
 
     /* ── ADD MODAL ── */
+    let modalTab = 'lib';
 
     function openAddModal() {
       buildLibList();
+      document.getElementById('newName').value  = '';
+      document.getElementById('newPrice').value = '';
       document.getElementById('libSearch').value = '';
+      // Render category dropdown for create form
+      document.getElementById('newCatWrap').innerHTML = catSelectHTML('newCatWrap', '');
+      switchModalTab('lib');
       HS.openModal('addModal');
     }
 
-    // switchModalTab removed — Create New moved to Raw Materials → Menu Items
+    function switchModalTab(tab) {
+      modalTab = tab;
+      document.getElementById('tabLib').style.display    = tab === 'lib' ? '' : 'none';
+      document.getElementById('tabNew').style.display    = tab === 'new' ? '' : 'none';
+      document.getElementById('tabLibBtn').className = 'modal-tab' + (tab === 'lib' ? ' active' : '');
+      document.getElementById('tabNewBtn').className = 'modal-tab' + (tab === 'new' ? ' active' : '');
+    }
 
     /* Build library list */
     function buildLibList(query = '') {
@@ -390,10 +428,7 @@
         if (inMenuActive.has(it.ItemKey)) {
           return `
             <div class="lib-item">
-              <div class="lib-info">
-                <div class="lib-name">${it.ItemName}</div>
-                ${it.Size ? `<div class="lib-def-price">${it.Size} ${it.SizeUnit||''} · ${it.Category||''}</div>` : ''}
-              </div>
+              <div class="lib-info"><div class="lib-name">${it.ItemName}</div></div>
               <span class="lib-badge in-menu">✓ In Menu</span>
             </div>`;
         }
@@ -401,7 +436,7 @@
           return `
             <div class="lib-item">
               <div class="lib-info"><div class="lib-name">${it.ItemName}</div></div>
-              <span class="lib-badge archived">Archived in Mela</span>
+              <span class="lib-badge archived">Archived</span>
             </div>`;
         }
         return `
@@ -409,10 +444,7 @@
             <div class="lib-check" id="chk-${it.ItemKey}" onclick="toggleLib('${it.ItemKey}','${it.DefaultPrice}')"></div>
             <div class="lib-info">
               <div class="lib-name">${it.ItemName}</div>
-              <div class="lib-def-price">
-                ${it.Category||''}${it.Size?' · '+it.Size+' '+(it.SizeUnit||''):''}
-                · Base price: ₹${HS.fmt(it.DefaultPrice)}
-              </div>
+              <div class="lib-def-price">Default: ₹${HS.fmt(it.DefaultPrice)}</div>
               <div id="price-row-${it.ItemKey}" style="display:none;">
                 <input class="lib-price-input" type="number" min="0"
                   id="lib-price-${it.ItemKey}" placeholder="Selling price for this mela"
@@ -467,24 +499,45 @@
     }
 
     /* Create new item */
+    async function createNewItem() {
+      const name     = document.getElementById('newName').value.trim();
+      const priceVal = document.getElementById('newPrice').value.trim();
+      const category = getCatValue('newCatWrap');
+      if (!name)           { HS.toast('Item name is required.', 'error'); return; }
+      if (priceVal === '') { HS.toast('Selling price is required.', 'error'); return; }
+      const price = Number(priceVal);
+      if (isNaN(price) || price < 0) { HS.toast('Enter a valid price (0 or more).', 'error'); return; }
+
+      HS.closeModal('addModal');
+      HS.loading(true, 'Creating item…');
+      try {
+        const res = await HS.api({
+          action: 'createMenuItem',
+          data: JSON.stringify({ name, price, category, melaId: mela.MelaId }),
+        });
+        if (res.success) { HS.toast('✅ Item created!', 'success'); await loadAll(); }
+        else HS.toast('Error: ' + (res.error||'Unknown'), 'error');
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
     /* ── EDIT MODAL ── */
     function openEditModal(itemKey) {
       const it = menuItems.find(i => i.ItemKey === itemKey);
       if (!it) return;
-      document.getElementById('editItemKey').value  = itemKey;
+      document.getElementById('editItemKey').value = itemKey;
       document.getElementById('editName').value    = it.ItemName;
       document.getElementById('editPrice').value   = it.SellingPrice;
-      // Size/category are global — show as read-only info
-      const infoEl = document.getElementById('editItemInfo');
-      if (infoEl) infoEl.textContent =
-        `${it.Category||''}${it.Size?' · '+it.Size+' '+(it.SizeUnit||''):''}`;
+      document.getElementById('editCatWrap').innerHTML = catSelectHTML('editCatWrap', it.Category || '');
       HS.openModal('editModal');
     }
 
     async function saveEdit() {
       const itemKey  = document.getElementById('editItemKey').value;
-      const name     = document.getElementById('editName').textContent.trim();
+      const name     = document.getElementById('editName').value.trim();
       const priceVal = document.getElementById('editPrice').value.trim();
+      const category = getCatValue('editCatWrap');
+      if (!name)           { HS.toast('Item name is required.', 'error'); return; }
       if (priceVal === '') { HS.toast('Price is required.', 'error'); return; }
       const price = Number(priceVal);
       if (isNaN(price) || price < 0) { HS.toast('Enter a valid price (0 or more).', 'error'); return; }
@@ -492,10 +545,10 @@
       HS.closeModal('editModal');
       HS.loading(true, 'Saving…');
       try {
-        const payload = { melaId: mela.MelaId, itemKey, sellingPrice: price };
-        const res1 = await HS.api({ action: 'updateMelaMenuItem', data: JSON.stringify(payload) });
-        if (res1.success) { HS.toast('✅ Price updated!', 'success'); await loadAll(); }
-        else HS.toast('Error: ' + (res1.error||'Unknown'), 'error');
+        const payload = { melaId: mela.MelaId, itemKey, sellingPrice: price, itemName: name, category };
+        const res = await HS.api({ action: 'updateMelaMenuItem', data: JSON.stringify(payload) });
+        if (res.success) { HS.toast('✅ Item updated!', 'success'); await loadAll(); }
+        else HS.toast('Error: ' + (res.error||'Unknown'), 'error');
       } catch(e) { HS.toast('Network error.', 'error'); }
       finally { HS.loading(false); }
     }

@@ -111,7 +111,7 @@ const HS = (() => {
   /* ══════════════════════════════════════
      SIDEBAR
   ══════════════════════════════════════ */
-  const SIDEBAR_NAV = [
+  const SIDEBAR_NAV_MELA = [
     { id: 'log',          icon: '📝', label: 'Log Sale',     href: 'log.html' },
     { id: 'dashboard',    icon: '📊', label: 'Dashboard',    href: 'dashboard.html' },
     { id: 'transactions', icon: '🧾', label: 'Transactions', href: 'transactions.html' },
@@ -120,12 +120,24 @@ const HS = (() => {
     { id: 'inventory',    icon: '📦', label: 'Inventory',    href: 'inventory.html' },
     { id: 'info',         icon: 'ℹ️',  label: 'Mela Info',   href: 'mela-info.html' },
   ];
+  const SIDEBAR_NAV_NONMELA = [
+    { id: 'nonmela-log',       icon: '📝', label: 'Log Order',  href: 'nonmela-log.html' },
+    { id: 'nonmela-dashboard', icon: '📊', label: 'Dashboard',  href: 'nonmela-dashboard.html' },
+    { id: 'nonmela-orders',    icon: '🧾', label: 'Orders',     href: 'nonmela-orders.html' },
+    { id: 'nonmela-menu',      icon: '🍽️', label: 'Menu',       href: 'nonmela-menu.html' },
+  ];
+  function getSidebarNav() {
+    const mela = getCurrentMela();
+    return (mela && mela.MelaId === 'nonmela') ? SIDEBAR_NAV_NONMELA : SIDEBAR_NAV_MELA;
+  }
+  // Keep backward-compat alias
+  const SIDEBAR_NAV = SIDEBAR_NAV_MELA;
 
   function renderSidebar(activeId = '') {
     const mela = getCurrentMela();
     const melaName = mela ? mela.name : APP_NAME;
 
-    const navLinks = SIDEBAR_NAV.map(item => `
+    const navLinks = getSidebarNav().map(item => `
       <a class="hs-sidebar-link ${activeId === item.id ? 'active' : ''}" href="${item.href}">
         <span class="s-icon">${item.icon}</span>${item.label}
       </a>
@@ -234,8 +246,25 @@ const HS = (() => {
     const query = Object.entries(params)
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    const resp = await fetch(`${url}?${query}`, { cache: 'no-store' });
-    const json = await resp.json();
+
+    // 30-second timeout — prevents infinite spinner if Apps Script is unreachable
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    let resp;
+    try {
+      resp = await fetch(`${url}?${query}`, { cache: 'no-store', signal: controller.signal });
+    } catch(fetchErr) {
+      clearTimeout(timer);
+      if (fetchErr.name === 'AbortError')
+        throw new Error('Request timed out. Check that the Apps Script is deployed and try again.');
+      throw fetchErr;
+    }
+    clearTimeout(timer);
+
+    let json;
+    try { json = await resp.json(); }
+    catch { throw new Error('Invalid response from Apps Script. Ensure it is deployed correctly.'); }
+
     if (json.error) throw new Error(json.error);
     return json;
   }
