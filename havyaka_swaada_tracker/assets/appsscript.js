@@ -406,25 +406,15 @@ function getNonMelaOrdersSheet(ss) {
   return s;
 }
 
-/* Ensure CategoryRecipes sheet has BaseValue column between BaseUnit and CreatedAt.
-   Existing rows get BaseValue = 1 (safe default meaning "per 1 unit"). */
-function ensureCatRecipesHasBaseValue(ss) {
+/* Remove stray BaseValue column from CategoryRecipes if present.
+   BaseValue now belongs in the Categories sheet, not here. */
+function cleanCatRecipesBaseValue(ss) {
   const sheet = getCatRecipesSheet(ss);
   const hdrs  = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
-  if (hdrs.includes('BaseValue')) return; // already present
-
-  // Find position of CreatedAt — insert BaseValue before it
-  const createdAtIdx = hdrs.indexOf('CreatedAt');
-  const insertCol    = createdAtIdx >= 0 ? createdAtIdx + 1 : hdrs.length + 1;
-
-  sheet.insertColumnBefore(insertCol);
-  sheet.getRange(1, insertCol).setValue('BaseValue').setFontWeight('bold');
-
-  // Set default BaseValue = 1 for all existing rows
-  const lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.getRange(2, insertCol, lastRow - 1, 1).setValue(1);
-  }
+  const bvCol = hdrs.indexOf('BaseValue');
+  if (bvCol < 0) return; // already clean
+  // Delete the column (1-based index)
+  sheet.deleteColumn(bvCol + 1);
   cDel('cat_recipes_all');
 }
 
@@ -1163,7 +1153,7 @@ function handleUpdatePaymentMode(ss,e) {
 ═══════════════════════════════════════ */
 
 function handleGetCategoryRecipes(ss, e) {
-  ensureCatRecipesHasBaseValue(ss);
+  cleanCatRecipesBaseValue(ss); // one-time cleanup: remove stray BaseValue column
   const category = e.parameter.category || null;
   const cKey     = category ? 'cat_recipes_' + category : 'cat_recipes_all';
   if (e.parameter.noCache !== '1') {
@@ -1177,7 +1167,6 @@ function handleGetCategoryRecipes(ss, e) {
 }
 
 function handleSaveCategoryRecipe(ss, e) {
-  ensureCatRecipesHasBaseValue(ss);
   const d     = JSON.parse(e.parameter.data);
   const sheet = getCatRecipesSheet(ss);
   const rows  = sheet.getDataRange().getValues();
@@ -1207,7 +1196,7 @@ function handleSaveCategoryRecipe(ss, e) {
   }
 
   const id = 'cr_' + Date.now();
-  sheet.appendRow([id, d.category, d.rawMaterialId, Number(d.qtyPerBaseUnit), d.baseUnit||'', Number(d.baseValue)||1, now]);
+  sheet.appendRow([id, d.category, d.rawMaterialId, Number(d.qtyPerBaseUnit), now]);
   cDel('cat_recipes_all', 'cat_recipes_' + d.category);
   return ok({ success: true, categoryRecipeId: id });
 }

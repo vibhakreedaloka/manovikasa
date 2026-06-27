@@ -122,8 +122,8 @@
       <div class="hs-modal-title">Add Items to Mela</div>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">
         Pick from the global menu library. To create a new item, go to
-        <a onclick="HS.navigate('raw-materials.html')" style="color:var(--gold);font-weight:700;cursor:pointer;">
-          Raw Materials → Menu Items</a>.
+        <a onclick="HS.closeModal('addModal');HS.navigate('global-menu.html')" style="color:var(--gold);font-weight:700;cursor:pointer;">
+          Menu ↗</a> from the home screen.
       </div>
       <input class="search-input" type="text" id="libSearch"
              placeholder="Search items…" oninput="filterLib()" />
@@ -152,8 +152,8 @@
         <input class="hs-input" type="number" id="editPrice" placeholder="e.g. 249" min="0" />
         <div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;">
           To change name, size or category — edit in
-          <a onclick="HS.closeModal('editModal');HS.navigate('raw-materials.html')"
-             style="color:var(--gold);font-weight:700;cursor:pointer;">Raw Materials → Menu Items ↗</a>
+          <a onclick="HS.closeModal('editModal');HS.navigate('global-menu.html')"
+             style="color:var(--gold);font-weight:700;cursor:pointer;">Menu ↗</a> from the home screen
         </div>
       </div>
 

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Menu Items — Havyaka Swaada</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    /* ── Filter bar ── */
+    .mi-filter { display:flex; gap:8px; margin-bottom:14px; }
+    .mi-filter-btn {
+      padding:6px 16px; border-radius:20px;
+      border:1.5px solid var(--border);
+      background:var(--cream); color:var(--brown-mid);
+      font-family:'Nunito',sans-serif; font-size:12.5px; font-weight:700;
+      cursor:pointer; transition:all .18s;
+    }
+    .mi-filter-btn.active { background:var(--brown); border-color:var(--brown); color:#fff; }
+
+    /* ── Category heading ── */
+    .mi-cat-head {
+      font-size:11px; font-weight:700; letter-spacing:.7px;
+      color:var(--text-muted); margin:18px 0 8px 2px;
+    }
+    .mi-cat-head:first-of-type { margin-top:4px; }
+
+    /* ── Item card ── */
+    .mi-card {
+      background:var(--cream-light); border:1px solid var(--border);
+      border-radius:var(--radius); padding:13px 14px;
+      margin-bottom:10px; box-shadow:var(--shadow-sm);
+      display:flex; align-items:center; gap:12px;
+    }
+    .mi-card.archived { opacity:.55; }
+    .mi-card-info { flex:1; min-width:0; }
+    .mi-card-name {
+      font-family:'Playfair Display',serif;
+      font-size:15px; font-weight:700; color:var(--brown-dark);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .mi-card-sub {
+      font-size:12px; color:var(--text-muted); margin-top:3px;
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    }
+    .mi-size-badge {
+      background:rgba(196,132,26,.12); color:var(--gold);
+      border-radius:20px; padding:2px 9px;
+      font-size:11px; font-weight:700;
+    }
+    .mi-price {
+      font-family:'Playfair Display',serif;
+      font-size:17px; font-weight:700; color:var(--brown);
+      white-space:nowrap; flex-shrink:0;
+    }
+    .mi-actions { display:flex; gap:6px; flex-shrink:0; }
+    .mi-action-btn {
+      width:32px; height:32px; border-radius:8px; border:none;
+      font-size:15px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .mi-action-btn:active { filter:brightness(.85); }
+  </style>
+</head>
+<body>
+
+  <header class="hs-header" id="hs-header"></header>
+
+  <main class="hs-page">
+    <div id="menuItemsContent">
+      <div class="hs-empty">
+        <div class="hs-spinner" style="margin:0 auto 12px;"></div>
+        <div class="hs-empty-sub">Loading menu items…</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- FAB: Add Menu Item (shown only on Menu Items tab) -->
+  <button class="hs-fab" onclick="openAddMenuItem()"
+    aria-label="Add Menu Item" style="bottom:24px;">+</button>
+
+  <!-- ══ ADD / EDIT GLOBAL MENU ITEM MODAL ══ -->
+  <div class="hs-modal-bg" id="miModal">
+    <div class="hs-modal">
+      <div class="hs-modal-handle"></div>
+      <div class="hs-modal-title" id="miModalTitle">Add Menu Item</div>
+      <input type="hidden" id="miItemKey" />
+
+      <div class="hs-field">
+        <label class="hs-label">Item Name *</label>
+        <input class="hs-input" type="text" id="miName"
+               placeholder="e.g. NutriPower 125g" autocomplete="off" />
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Category *</label>
+        <div id="miCatWrap"></div>
+      </div>
+      <div class="hs-field">
+        <label class="hs-label">Base Selling Price (₹) *</label>
+        <input class="hs-input" type="number" id="miPrice" min="0"
+               placeholder="e.g. 199" />
+      </div>
+      <div class="hs-row" style="gap:8px;">
+        <div class="hs-field" style="flex:1;">
+          <label class="hs-label">Size</label>
+          <input class="hs-input" type="number" id="miSize" min="0"
+                 step="any" placeholder="e.g. 125" />
+        </div>
+        <div class="hs-field" style="flex:1;" id="miUnitWrap">
+          <label class="hs-label">Unit</label>
+          <!-- filled dynamically by miRenderUnitField() -->
+          <input class="hs-input" type="text" id="miSizeUnit" readonly
+                 placeholder="Select category first"
+                 style="background:var(--cream-dark);color:var(--text-muted);cursor:default;" />
+        </div>
+      </div>
+
+      <div class="hs-mt">
+        <button class="hs-btn hs-btn-primary hs-btn-full" onclick="saveMenuItem()">💾 Save</button>
+      </div>
+      <div class="hs-mt-sm">
+        <button class="hs-btn hs-btn-ghost hs-btn-full" onclick="HS.closeModal('miModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="assets/common.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      HS.renderHeader({ title: 'Menu Items', showBack: true });
+      await loadMenuItems();
+    });
+
+    /* ══════════════════════════════════════
+       MENU ITEMS TAB
+    ══════════════════════════════════════ */
+    let menuItemsLoaded = false;
+    let globalMenuItems = [];
+    let miCategories    = [];
+    let miFilter        = 'active';
+    let miCatSettings   = {}; // { catName: { baseValue, baseUnit } }
+    const UNIT_OPTS = `<option value="gms">gms</option><option value="kg">kg</option><option value="mg">mg</option><option value="ml">ml</option><option value="litres">litres</option><option value="count">count</option>`;
+
+    async function loadMenuItems() {
+      HS.loading(true, 'Loading menu items…');
+      try {
+        // Sequential to pinpoint failures
+        const miRes  = await HS.api({ action: 'getMenuItems', includeArchived: '1' });
+        const catRes = await HS.api({ action: 'getCategories' });
+        globalMenuItems = miRes.data  || [];
+        miCategories    = catRes.data || [];
+        // Build category settings map { name: { baseValue, baseUnit } }
+        miCatSettings = {};
+        (catRes.categories || []).forEach(c => { miCatSettings[c.name] = c; });
+        menuItemsLoaded = true;
+        renderMenuItems();
+      } catch(err) {
+        const msg = err?.message || String(err);
+        HS.toast('Could not load menu items: ' + msg, 'error');
+        document.getElementById('menuItemsContent').innerHTML = `
+          <div class="hs-empty">
+            <div class="hs-empty-icon">⚠️</div>
+            <div class="hs-empty-title">Could not load</div>
+            <div class="hs-empty-sub" style="color:var(--red);font-size:12px;">${msg}</div>
+            <button class="hs-btn hs-btn-primary hs-mt" onclick="loadMenuItems()">🔄 Retry</button>
+          </div>`;
+      } finally { HS.loading(false); }
+    }
+
+    function renderMenuItems() {
+      const filtered = globalMenuItems.filter(m =>
+        miFilter === 'all'      ? true :
+        miFilter === 'archived' ? m.Status === 'archived' :
+                                  m.Status !== 'archived'
+      );
+
+      // Group by category
+      const byCategory = {};
+      filtered.forEach(m => {
+        const cat = m.Category || 'Uncategorised';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(m);
+      });
+
+      const active   = globalMenuItems.filter(m => m.Status !== 'archived').length;
+      const archived = globalMenuItems.filter(m => m.Status === 'archived').length;
+
+      let html = `
+        <div class="mi-filter">
+          <button class="mi-filter-btn ${miFilter==='active'?'active':''}"
+            onclick="setMiFilter('active',this)">Active (${active})</button>
+          <button class="mi-filter-btn ${miFilter==='archived'?'active':''}"
+            onclick="setMiFilter('archived',this)">Archived (${archived})</button>
+          <button class="mi-filter-btn ${miFilter==='all'?'active':''}"
+            onclick="setMiFilter('all',this)">All (${globalMenuItems.length})</button>
+        </div>`;
+
+      if (!filtered.length) {
+        html += `<div class="hs-empty">
+          <div class="hs-empty-icon">🍽️</div>
+          <div class="hs-empty-title">No menu items</div>
+          <div class="hs-empty-sub">Tap + to add your first global menu item.</div>
+        </div>`;
+      } else {
+        Object.entries(byCategory).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([cat, items]) => {
+          html += `<div class="mi-cat-head">${cat.toUpperCase()}</div>`;
+          items.sort((a,b)=>(a.ItemName||'').localeCompare(b.ItemName||'')).forEach(m => {
+            const isArch = m.Status === 'archived';
+            const size   = m.Size ? `${m.Size} ${m.SizeUnit||''}` : '';
+            html += `
+              <div class="mi-card${isArch?' archived':''}">
+                <div class="mi-card-info">
+                  <div class="mi-card-name">${m.ItemName}</div>
+                  <div class="mi-card-sub">
+                    ${size ? `<span class="mi-size-badge">${size}</span>` : ''}
+                    ${isArch ? `<span class="hs-badge" style="background:var(--border);color:var(--text-muted);font-size:10px;">Archived</span>` : ''}
+                  </div>
+                </div>
+                <div class="mi-price">₹${HS.fmt(m.DefaultPrice||0)}</div>
+                <div class="mi-actions">
+                  ${isArch
+                    ? `<button class="mi-action-btn" style="background:rgba(61,99,56,.12);"
+                         onclick="archiveMI('${m.ItemKey}','active')" title="Restore">♻️</button>`
+                    : `<button class="mi-action-btn" style="background:rgba(61,99,56,.12);"
+                         onclick="openEditMenuItem('${m.ItemKey}')" title="Edit">✏️</button>
+                       <button class="mi-action-btn" style="background:rgba(184,50,37,.10);"
+                         onclick="archiveMI('${m.ItemKey}','archived')" title="Archive">📦</button>`
+                  }
+                </div>
+              </div>`;
+          });
+        });
+      }
+
+      document.getElementById('menuItemsContent').innerHTML = html;
+    }
+
+    function setMiFilter(f, el) {
+      miFilter = f;
+      document.querySelectorAll('.mi-filter-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+      renderMenuItems();
+    }
+
+    /* ── Category helper (reuse raw-materials pattern) ── */
+    function miCatSelectHTML(wrapperId, selected) {
+      const opts = miCategories.map(c =>
+        `<option value="${c}" ${c===selected?'selected':''}>${c}</option>`
+      ).join('');
+      return `
+        <select class="hs-input" id="${wrapperId}_sel"
+          onchange="miOnCatChange('${wrapperId}')">
+          <option value="">-- Select category --</option>
+          ${opts}
+          <option value="__new__">＋ Add new category</option>
+        </select>
+        <div id="${wrapperId}_new" style="display:none;margin-top:8px;">
+          <div class="hs-row">
+            <input class="hs-input" type="text" id="${wrapperId}_inp"
+                   placeholder="New category name…" style="flex:1;" />
+            <button class="hs-btn hs-btn-primary hs-btn-sm"
+              onclick="miConfirmNewCat('${wrapperId}')">Add</button>
+          </div>
+        </div>`;
+    }
+
+    function miOnCatChange(w) {
+      const sel = document.getElementById(w + '_sel');
+      const nf  = document.getElementById(w + '_new');
+      if (sel.value === '__new__') {
+        nf.style.display = 'block';
+        document.getElementById(w + '_inp').focus();
+        miRenderUnitField('');
+      } else {
+        nf.style.display = 'none';
+        const catSetting = miCatSettings[sel.value] || {};
+        // Pass the actual baseUnit string — '' means "category selected but unit not set"
+        miRenderUnitField(catSetting.baseUnit || '');
+      }
+    }
+
+    /* Render the Unit field — 3 states:
+       undefined/null = no category selected yet → show empty placeholder
+       ''             = category selected but no base unit → show unit selector
+       'gms' etc      = category has base unit → show read-only */
+    function miRenderUnitField(baseUnit) {
+      const wrap = document.getElementById('miUnitWrap');
+      if (!wrap) return;
+
+      if (baseUnit === undefined || baseUnit === null) {
+        // No category selected yet — blank placeholder
+        wrap.innerHTML = `
+          <label class="hs-label">Unit</label>
+          <input class="hs-input" type="text" id="miSizeUnit" readonly
+                 placeholder="Select category first"
+                 style="background:var(--cream-dark);color:var(--text-muted);cursor:default;" />`;
+      } else if (baseUnit === '') {
+        // Category selected but no base unit set — show selector
+        wrap.innerHTML = `
+          <label class="hs-label">Unit <span style="color:var(--red);font-size:10px;">⚠️ Not set for category</span></label>
+          <select class="hs-input" id="miSizeUnit">
+            <option value="">-- Set base unit --</option>
+            ${UNIT_OPTS}
+          </select>
+          <div style="font-size:11px;color:var(--gold);margin-top:3px;">
+            Saved as the category unit. Set base quantity in Recipes.
+          </div>`;
+      } else {
+        // Category has a base unit — show read-only
+        wrap.innerHTML = `
+          <label class="hs-label">Unit</label>
+          <input class="hs-input" type="text" id="miSizeUnit" readonly value="${baseUnit}"
+                 style="background:var(--cream-dark);color:var(--text-muted);cursor:default;" />
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">
+            From category base unit
+          </div>`;
+      }
+    }
+
+
+    async function miConfirmNewCat(w) {
+      const name = document.getElementById(w + '_inp').value.trim();
+      if (!name) { HS.toast('Enter a category name.', 'error'); return; }
+      try {
+        const res = await HS.api({ action: 'addCategory', name });
+        if (res.success) {
+          miCategories.push(name);
+          document.getElementById(w).innerHTML = miCatSelectHTML(w, name);
+          HS.toast('✅ Category added!', 'success');
+        }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+    }
+
+    function miGetCat(w) {
+      const sel = document.getElementById(w + '_sel');
+      return sel && sel.value !== '__new__' ? sel.value : '';
+    }
+
+    /* ── Add / Edit ── */
+    function openAddMenuItem() {
+      document.getElementById('miModalTitle').textContent = 'Add Menu Item';
+      document.getElementById('miItemKey').value  = '';
+      document.getElementById('miName').value     = '';
+      document.getElementById('miPrice').value    = '';
+      document.getElementById('miSize').value     = '';
+      document.getElementById('miCatWrap').innerHTML = miCatSelectHTML('miCatWrap', '');
+      miRenderUnitField(null); // null = no category selected yet
+      HS.openModal('miModal');
+    }
+
+    function openEditMenuItem(itemKey) {
+      const m = globalMenuItems.find(m => m.ItemKey === itemKey);
+      if (!m) return;
+      document.getElementById('miModalTitle').textContent = 'Edit Menu Item';
+      document.getElementById('miItemKey').value  = itemKey;
+      document.getElementById('miName').value     = m.ItemName     || '';
+      document.getElementById('miPrice').value    = m.DefaultPrice || '';
+      document.getElementById('miSize').value     = m.Size         || '';
+      document.getElementById('miCatWrap').innerHTML = miCatSelectHTML('miCatWrap', m.Category || '');
+      // Render unit field — if category has base unit, show read-only; else show selector
+      const catSetting = miCatSettings[m.Category] || {};
+      const unitToShow = m.SizeUnit || catSetting.baseUnit || '';
+      miRenderUnitField(unitToShow);
+      HS.openModal('miModal');
+    }
+
+    async function saveMenuItem() {
+      const itemKey  = document.getElementById('miItemKey').value;
+      const name     = document.getElementById('miName').value.trim();
+      const category = miGetCat('miCatWrap');
+      const priceVal = document.getElementById('miPrice').value.trim();
+      const size     = Number(document.getElementById('miSize').value || 0);
+      const sizeUnitEl = document.getElementById('miSizeUnit');
+      const sizeUnit   = sizeUnitEl ? (sizeUnitEl.value || '') : '';
+
+      if (!name)     { HS.toast('Name is required.', 'error');     return; }
+      if (!category) { HS.toast('Category is required.', 'error'); return; }
+      if (!priceVal) { HS.toast('Price is required.', 'error');    return; }
+      const price = Number(priceVal);
+      if (isNaN(price) || price < 0) { HS.toast('Enter a valid price.', 'error'); return; }
+
+      // Check if we need to save the category base unit (first time it's been set)
+      const catSetting    = miCatSettings[category] || {};
+      const needsBaseUnit = !catSetting.baseUnit;
+
+      HS.closeModal('miModal');
+      HS.loading(true, itemKey ? 'Updating…' : 'Saving…');
+      try {
+        // If category base unit was just set here, save it (baseValue defaults to 1)
+        if (needsBaseUnit && sizeUnit) {
+          const catRes = await HS.api({
+            action: 'updateCategoryBase',
+            category,
+            baseValue: 1,
+            baseUnit: sizeUnit,
+          });
+          if (catRes.success) {
+            miCatSettings[category] = { baseValue: 1, baseUnit: sizeUnit };
+          }
+        }
+
+        const isEdit = !!itemKey;
+        const action = isEdit ? 'updateGlobalMenuItem' : 'addGlobalMenuItem';
+        const data   = { itemKey, name, price, category, size, sizeUnit };
+        const res    = await HS.api({ action, data: JSON.stringify(data) });
+        if (res.success) {
+          HS.toast(isEdit ? '✅ Item updated!' : '✅ Item added!', 'success');
+          menuItemsLoaded = false;
+          await loadMenuItems();
+        } else { HS.toast('Error: ' + (res.error || 'Unknown'), 'error'); }
+      } catch(e) { HS.toast('Network error.', 'error'); }
+      finally { HS.loading(false); }
+    }
+
+    async function archiveMI(itemKey, status) {
+      const m     = globalMenuItems.find(m => m.ItemKey === itemKey);
+      const label = status === 'archived' ? 'archive' : 'restore';
+      HS.confirm(`${label.charAt(0).toUpperCase()+label.slice(1)} "${m?.ItemName}"?`, async () => {
+        HS.loading(true, status === 'archived' ? 'Archiving…' : 'Restoring…');
+        try {
+          const res = await HS.api({ action: 'archiveGlobalMenuItem', itemKey, status });
+          if (res.success) {
+            HS.toast(`✅ ${m?.ItemName} ${status === 'archived' ? 'archived' : 'restored'}.`, 'success');
+            menuItemsLoaded = false;
+            await loadMenuItems();
+          } else { HS.toast('Error: ' + (res.error||'Unknown'), 'error'); }
+        } catch(e) { HS.toast('Network error.', 'error'); }
+        finally { HS.loading(false); }
+      });
+    }
+
+    /* ── Recipes iframe auto-resize ── */
+    function resizeRecipesIframe(iframe) {
+      try {
+        const h = iframe.contentDocument?.body?.scrollHeight;
+        if (h && h > 200) iframe.style.height = h + 'px';
+      } catch(e) {}
+    }
+
+    // Listen for height updates posted from the embedded recipes page
+    window.addEventListener('message', e => {
+      if (e.data?.type === 'recipesHeight') {
+        const iframe = document.getElementById('recipesIframe');
+        if (iframe) iframe.style.height = e.data.height + 'px';
+      }
+    });
+
+  </script>
+</body>
+</html>
